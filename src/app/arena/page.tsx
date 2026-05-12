@@ -5,7 +5,7 @@ import { useMatchmaker } from "@/hooks/useMatchmaker";
 import { useFaceScanner } from "@/hooks/useFaceScanner";
 import { calculateMogScore } from "@/utils/faceMath";
 import { calculateEloUpdate } from "@/utils/eloMath";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 const SLEEK_INDICES = [10, 152, 234, 454, 132, 361, 33, 263, 4, 61, 291];
 
