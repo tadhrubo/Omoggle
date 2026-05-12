@@ -13,7 +13,7 @@ interface CameraCheckModalProps {
 export default function CameraCheckModal({ isOpen, onComplete, onExit }: CameraCheckModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number | undefined>(undefined);
 
   const [streamActive, setStreamActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);

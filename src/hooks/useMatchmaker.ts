@@ -121,7 +121,7 @@ export function useMatchmaker({ onDisconnect }: { onDisconnect?: () => void } = 
         });
 
         newPeer.on("open", (id) => {
-          if (!isMounted) return;
+          if (!isMounted || !newPeer) return;
           setPeerId(id);
           peerRef.current = newPeer;
           findMatchInternal(newPeer, stream);

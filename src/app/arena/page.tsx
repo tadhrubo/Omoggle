@@ -11,7 +11,7 @@ export default function Arena() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localCanvasRef = useRef<HTMLCanvasElement>(null);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number | undefined>(undefined);
   const lastTelemetryTime = useRef(0);
 
   const [battlePhase, setBattlePhase] = useState<"waiting" | "countdown" | "result">("waiting");
@@ -109,8 +109,8 @@ export default function Arena() {
               const now = performance.now();
               if (now - lastTelemetryTime.current > 100) {
                 const mogData = calculateMogScore(result.faceLandmarks[0] as any);
-                setLiveMyScore(mogData.finalScore);
-                sendTelemetry("LIVE_SCORE", { score: mogData.finalScore });
+                setLiveMyScore(mogData.score);
+                sendTelemetry("LIVE_SCORE", { score: mogData.score });
                 lastTelemetryTime.current = now;
               }
             }
@@ -132,8 +132,8 @@ export default function Arena() {
     if (battlePhase === "countdown" && countdown === 0 && myScore === null) {
       // Lock in final score
       const mogData = calculateMogScore({ faceLandmarks: [] } as any);
-      setMyScore(liveMyScore || mogData.finalScore);
-      sendTelemetry("FINAL_SCORE", { score: liveMyScore || mogData.finalScore });
+      setMyScore(liveMyScore || mogData.score);
+      sendTelemetry("FINAL_SCORE", { score: liveMyScore || mogData.score });
       setBattlePhase("result");
     }
   }, [battlePhase, countdown, myScore, liveMyScore, sendTelemetry]);
