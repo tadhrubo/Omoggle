@@ -160,14 +160,19 @@ export default function Home() {
   };
 
   const handleEnterArena = () => {
+    // Check if user is banned
+    if (profile?.is_banned) {
+      alert("Your account has been suspended. Contact support for assistance.");
+      return;
+    }
     if (session) {
-      router.push("/lobby"); 
+      router.push("/lobby");
     } else {
       if (guestHandle.trim().length > 0) {
         localStorage.setItem("omoggle_guest_name", guestHandle.trim());
         router.push("/lobby");
       } else {
-        setIsAuthModalOpen(true); 
+        setIsAuthModalOpen(true);
       }
     }
   };
@@ -225,7 +230,13 @@ export default function Home() {
         {!session && !loadingAuth && (
           <input type="text" placeholder="ENTER GUEST HANDLE" value={guestHandle} onChange={(e) => setGuestHandle(e.target.value)} style={{ width: "100%", padding: "18px", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid #27272a", borderRadius: "12px", color: "white", textAlign: "center", fontSize: "16px", letterSpacing: "2px", outline: "none", fontFamily: "monospace", transition: "border-color 0.2s" }} onFocus={(e) => e.target.style.borderColor = "#ef4444"} onBlur={(e) => e.target.style.borderColor = "#27272a"} />
         )}
-        <button onClick={handleEnterArena} style={{ width: "100%", padding: "20px", backgroundColor: "#ef4444", color: "white", border: "none", borderRadius: "12px", fontSize: "18px", fontWeight: "900", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", cursor: "pointer", transition: "all 0.2s", boxShadow: "0 0 30px rgba(239, 68, 68, 0.3)" }} onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.03)"} onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}><Swords size={24} /> {session ? "ENTER LOBBY" : "ENTER THE ARENA"}</button>
+        {profile?.is_banned ? (
+          <div style={{ width: "100%", padding: "20px", backgroundColor: "#27272a", color: "#71717a", border: "1px solid #ef4444", borderRadius: "12px", fontSize: "18px", fontWeight: "900", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+            <X size={24} /> SUSPENDED
+          </div>
+        ) : (
+          <button onClick={handleEnterArena} style={{ width: "100%", padding: "20px", backgroundColor: "#ef4444", color: "white", border: "none", borderRadius: "12px", fontSize: "18px", fontWeight: "900", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", cursor: "pointer", transition: "all 0.2s", boxShadow: "0 0 30px rgba(239, 68, 68, 0.3)" }} onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.03)"} onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}><Swords size={24} /> {session ? "ENTER LOBBY" : "ENTER THE ARENA"}</button>
+        )}
       </div>
 
       <div style={{ display: "flex", justifyContent: "center", gap: "clamp(30px, 8vw, 80px)", textAlign: "center" }}>

@@ -9,6 +9,36 @@ import { createClient } from "@/lib/supabase";
 
 const SLEEK_INDICES = [10, 152, 234, 454, 132, 361, 33, 263, 4, 61, 291];
 
+// Simple audio synthesis for tick and victory/defeat
+const playTickSound = () => {
+  const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.frequency.value = 800;
+  gain.gain.setValueAtTime(0.3, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.1);
+};
+
+const playResultSound = (isWin: boolean) => {
+  const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const notes = isWin ? [523, 659, 784] : [392, 311, 262];
+  notes.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.2, ctx.currentTime + i * 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.15 + 0.3);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime + i * 0.15);
+    osc.stop(ctx.currentTime + i * 0.15 + 0.3);
+  });
+};
+
 const getMatchVerdict = (myScore: number, oppScore: number) => {
   const diff = myScore - oppScore;
   const absDiff = Math.abs(diff);
@@ -33,7 +63,7 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localCanvasRef = useRef<HTMLCanvasElement>(null);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number | undefined>(undefined);
   const lastTelemetryTime = useRef(0);
   
   const [battlePhase, setBattlePhase] = useState<"waiting" | "connected" | "countdown" | "result">("waiting");
@@ -135,22 +165,33 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
                 // 3. MATCH END LOGIC
                 if (countdown === 0 && myScore === null) {
                   const final = calculateMogScore(result.faceLandmarks[0] as any).score;
-                  setMyScore(final); 
+                  setMyScore(final);
                   sendTelemetry("FINAL_SCORE", { score: final });
                   setBattlePhase("result");
 
-                  // Calculate ELO Changes
+                  // Play victory/defeat sound
                   const isWinner = final > (opponentScore || 0);
+                  playResultSound(isWinner);
                   const oppElo = remoteProfile?.elo || 1200;
                   const { newElo, eloChange } = calculateEloUpdate(localProfile.elo, oppElo, isWinner);
                   
                   setEloResult({ newElo, change: eloChange });
 
-                  // ONLY Persist to Supabase if Ranked Mode AND User is Authenticated
+                  // Persist: ELO + Match Record (Ranked + Authenticated only)
                   if (mode === "ranked" && localProfile.id) {
-                    supabase.from('profiles').update({ 
+                    supabase.from('profiles').update({
                       elo: newElo
                     }).eq('id', localProfile.id).then(() => console.log("Ranked Match Reported."));
+
+                    // Save match to history
+                    supabase.from('matches').insert([{
+                      winner_id: isWinner ? localProfile.id : (remoteProfile?.id || null),
+                      loser_id: isWinner ? (remoteProfile?.id || null) : localProfile.id,
+                      winner_score: isWinner ? final : (opponentScore || 0),
+                      loser_score: isWinner ? (opponentScore || 0) : final,
+                      elo_change: Math.abs(eloChange),
+                      mode: mode
+                    }]).then(() => console.log("Match record saved."));
                   }
                 }
               }
@@ -165,6 +206,7 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
 
   useEffect(() => {
     if (battlePhase === "countdown" && countdown > 0) {
+      playTickSound();
       const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
       return () => clearTimeout(timer);
     }
@@ -255,8 +297,17 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
         </div>
       </div>
 
-      {/* Footer - Preserved exact reload logic */}
-      <div style={{ flex: "none", height: "80px", display: "flex", alignItems: "center", justifyContent: "center", borderTop: "1px solid #27272a", backgroundColor: "#09090b", zIndex: 110 }}>
+      {/* Footer - Skip + Report */}
+      <div style={{ flex: "none", height: "80px", display: "flex", alignItems: "center", justifyContent: "center", gap: "20px", borderTop: "1px solid #27272a", backgroundColor: "#09090b", zIndex: 110 }}>
+        <button onClick={() => {
+          if (remoteProfile?.id && localProfile.id) {
+            supabase.rpc('increment_report', { user_id: remoteProfile.id }).then(() => alert("Report submitted. Thanks!"));
+          } else {
+            alert("Cannot report anonymous players.");
+          }
+        }} style={{ backgroundColor: "transparent", color: "#71717a", fontWeight: "bold", fontSize: "14px", padding: "12px 24px", borderRadius: "99px", border: "1px solid #27272a", cursor: "pointer" }}>
+          REPORT
+        </button>
         <button onClick={() => window.location.reload()} style={{ backgroundColor: "#ef4444", color: "white", fontWeight: "900", fontSize: "18px", padding: "12px 48px", borderRadius: "99px", border: "none", cursor: "pointer" }}>
           {battlePhase === "result" ? "NEXT BATTLE" : "SKIP"}
         </button>

@@ -69,6 +69,8 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
         setRemoteStream(remoteMedia);
         setIsConnected(true);
         setIsSearching(false);
+        // Haptic feedback on connection
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
       });
 
       const conn = peer.connect(opponentId);
@@ -139,13 +141,14 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
         });
 
         peer.on("call", (call) => {
-          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); 
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
           call.answer(stream);
           callRef.current = call;
           call.on("stream", (remoteMedia) => {
             setRemoteStream(remoteMedia);
             setIsConnected(true);
             setIsSearching(false);
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
           });
         });
 

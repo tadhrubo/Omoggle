@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { Swords, Trophy, BarChart3, ShieldCheck, Star } from "lucide-react";
+import { Swords, Trophy, BarChart3, ShieldCheck, Star, MessageCircle, Send } from "lucide-react";
 
 // Community-accurate ranks with Sub-Tier logic (1-5)
 const RANK_GROUPS = [
@@ -19,15 +19,69 @@ export default function Lobby() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"modes" | "ranks">("modes");
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [recentMatches, setRecentMatches] = useState<any[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUsername, setCurrentUsername] = useState<string>("Guest");
+  const [currentTier, setCurrentTier] = useState<string>("Silver");
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
 
+  // Fetch initial data
   useEffect(() => {
-    const fetchLeaders = async () => {
-      const { data } = await supabase.from('profiles').select('*').order('elo', { ascending: false }).limit(10);
-      if (data) setLeaderboard(data);
+    const fetchData = async () => {
+      // Fetch leaderboard
+      const { data: leaders } = await supabase.from('profiles').select('*').order('elo', { ascending: false }).limit(10);
+      if (leaders) setLeaderboard(leaders);
+
+      // Fetch current user and their recent matches
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setCurrentUserId(session.user.id);
+        const { data: profile } = await supabase.from('profiles').select('username, tier').eq('id', session.user.id).single();
+        if (profile) {
+          setCurrentUsername(profile.username || "Mogger");
+          setCurrentTier(profile.tier || "Silver");
+        }
+        const { data: matches } = await supabase
+          .from('matches')
+          .select('*')
+          .or(`winner_id.eq.${session.user.id},loser_id.eq.${session.user.id}`)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        if (matches) setRecentMatches(matches);
+      }
+
+      // Fetch recent chat messages
+      const { data: messages } = await supabase.from('global_chat').select('*').order('created_at', { ascending: false }).limit(50);
+      if (messages) setChatMessages(messages.reverse());
     };
-    fetchLeaders();
+    fetchData();
   }, [supabase]);
+
+  // Real-time chat subscription
+  useEffect(() => {
+    const channel = supabase.channel('global_chat').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'global_chat' }, (payload) => {
+      setChatMessages(prev => [...prev, payload.new]);
+    }).subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [supabase]);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  const sendChatMessage = async () => {
+    if (!chatInput.trim()) return;
+    await supabase.from('global_chat').insert([{ user_id: currentUserId, username: currentUsername, message: chatInput.trim(), tier: currentTier }]);
+    setChatInput("");
+  };
+
+  const handleChatKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") sendChatMessage();
+  };
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#050505", color: "white", padding: "40px 20px", fontFamily: "'Inter', sans-serif" }}>
@@ -102,8 +156,40 @@ export default function Lobby() {
             )}
           </main>
 
-          {/* Right Sidebar: PRESTIGE RANK HIERARCHY */}
-          <aside>
+          {/* Right Sidebar: Recent Battles + Prestige */}
+          <aside style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {/* Recent Battles */}
+            {recentMatches.length > 0 && (
+              <div style={{ backgroundColor: "#0f0f12", border: "1px solid #18181b", borderRadius: "16px", padding: "24px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px", color: "#ef4444" }}>
+                  <Swords size={16} />
+                  <h3 style={{ fontSize: "11px", fontWeight: "900", letterSpacing: "2px", margin: 0 }}>RECENT BATTLES</h3>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {recentMatches.map((match) => {
+                    const isWinner = match.winner_id === currentUserId;
+                    return (
+                      <div key={match.id} style={{ padding: "10px", backgroundColor: "rgba(255,255,255,0.02)", borderRadius: "8px", borderLeft: `3px solid ${isWinner ? "#39FF14" : "#ef4444"}` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "11px", fontWeight: "bold", color: isWinner ? "#39FF14" : "#ef4444" }}>
+                            {isWinner ? "VICTORY" : "DEFEAT"}
+                          </span>
+                          <span style={{ fontSize: "9px", color: "#52525b" }}>
+                            {match.mode}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: "10px", color: "#71717a", marginTop: "4px" }}>
+                          {match.winner_score?.toFixed(1)} - {match.loser_score?.toFixed(1)}
+                          {match.elo_change > 0 && <span style={{ color: isWinner ? "#39FF14" : "#ef4444", marginLeft: "8px" }}>{isWinner ? "+" : "-"}{match.elo_change}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Prestige Hierarchy */}
             <div style={{ backgroundColor: "#0f0f12", border: "1px solid #18181b", borderRadius: "16px", padding: "24px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", color: "#fbbf24" }}>
                 <Star size={16} fill="#fbbf24" />
@@ -116,7 +202,7 @@ export default function Lobby() {
                       <div style={{ fontSize: "12px", fontWeight: "900", color: r.color }}>{r.name}</div>
                       <div style={{ fontSize: "9px", color: "#3f3f46", fontWeight: "bold" }}>{r.minElo}+ ELO</div>
                     </div>
-                    {/* Sub-Tier Visualization (Sub 1 - Sub 5) */}
+                    {/* Sub-Tier Visualization */}
                     {r.levels > 1 && (
                       <div style={{ display: "flex", gap: "4px" }}>
                         {[1, 2, 3, 4, 5].map(lvl => (
@@ -126,6 +212,39 @@ export default function Lobby() {
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Global Chat */}
+            <div style={{ backgroundColor: "#0f0f12", border: "1px solid #18181b", borderRadius: "16px", padding: "24px", maxHeight: "300px", display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px", color: "#a855f7" }}>
+                <MessageCircle size={16} />
+                <h3 style={{ fontSize: "11px", fontWeight: "900", letterSpacing: "2px", margin: 0 }}>GLOBAL CHAT</h3>
+              </div>
+              <div style={{ flex: 1, overflowY: "auto", marginBottom: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                {chatMessages.map((msg) => {
+                  const tierColor = { Bronze: "#cd7f32", Silver: "#c0c0c0", Gold: "#ffd700", Platinum: "#e5e4e2", Diamond: "#b9f2ff", Crown: "#ff6b6b", "God Tier": "#9d4edd" }[msg.tier as string] || "#c0c0c0";
+                  return (
+                    <div key={msg.id} style={{ fontSize: "11px" }}>
+                      <span style={{ color: tierColor, fontWeight: "bold" }}>{msg.username}:</span>
+                      <span style={{ color: "#a1a1aa", marginLeft: "6px" }}>{msg.message}</span>
+                    </div>
+                  );
+                })}
+                <div ref={chatEndRef} />
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={handleChatKeyDown}
+                  placeholder="Say something..."
+                  style={{ flex: 1, backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "8px", padding: "8px 12px", color: "white", fontSize: "11px", outline: "none" }}
+                />
+                <button onClick={sendChatMessage} style={{ backgroundColor: "#a855f7", border: "none", borderRadius: "8px", padding: "8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Send size={14} color="white" />
+                </button>
               </div>
             </div>
           </aside>
