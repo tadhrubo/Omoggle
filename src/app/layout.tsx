@@ -1,21 +1,12 @@
 import type { Metadata } from "next";
-import { Bebas_Neue, JetBrains_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 
-const bebas = Bebas_Neue({
-  weight: "400",
-  variable: "--font-bebas",
-  subsets: ["latin"],
-});
-
-const jetbrains = JetBrains_Mono({
-  variable: "--font-jetbrains",
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Omoggle - MOG OR BE MOGGED",
-  description: "Real-time looksmaxxing battles via P2P video chat",
+  title: "OMOGGLE - 1v1 Mog Battles",
+  description: "Global looksmaxxing arena.",
 };
 
 export default function RootLayout({
@@ -24,8 +15,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${bebas.variable} ${jetbrains.variable}`}>
-      <body className="min-h-screen bg-[#09090B] text-zinc-200 antialiased">
+    <html lang="en">
+      <body className={inter.className}>
         {children}
       </body>
     </html>

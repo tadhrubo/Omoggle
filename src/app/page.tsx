@@ -1,148 +1,265 @@
 "use client";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase";
+import { Swords, LogOut, User, X, Settings } from "lucide-react";
 
-import { useState } from "react";
-import { Swords, ArrowRight, Crown, Medal, Trophy } from "lucide-react";
+/**
+ * PRESTIGE HIERARCHY UTILITY
+ * Single source of truth for Ranks and Visual Styles
+ */
+const getTier = (elo: number) => {
+  if (elo >= 2500) return { label: "TRUE ADAM", color: "#ffffff", glow: "0 0 20px #fff" };
+  if (elo >= 2200) return { label: "TERRACHAD", color: "#fbbf24", glow: "0 0 15px #fbbf24" };
+  if (elo >= 1900) return { label: "CHAD", color: "#ef4444", glow: "0 0 10px #ef4444" };
+  if (elo >= 1600) return { label: "CHADLITE", color: "#a855f7", glow: "none" };
+  if (elo >= 1300) return { label: "HTN", color: "#3b82f6", glow: "none" };
+  if (elo >= 1000) return { label: "MTN", color: "#22c55e", glow: "none" };
+  return { label: "LTN", color: "#71717a", glow: "none" };
+};
 
-const leaderboardData = [
-  { rank: 1, username: "Chad_Supreme", score: 2847, tier: "GOD", tierColor: "text-yellow-400" },
-  { rank: 2, username: "AlphaWolf", score: 2734, tier: "ELITE", tierColor: "text-purple-400" },
-  { rank: 3, username: "BoneStructure", score: 2612, tier: "ELITE", tierColor: "text-purple-400" },
-  { rank: 4, username: "Looksmax_King", score: 2543, tier: "PRO", tierColor: "text-red-400" },
-  { rank: 5, username: "Maxxinator", score: 2489, tier: "PRO", tierColor: "text-red-400" },
-];
+// Custom hook for the ticking number animation in the footer
+function useAnimatedNumber(end: number, duration: number = 2000) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    let startTime: number | null = null;
+    const animate = (currentTime: number) => {
+      if (!startTime) startTime = currentTime;
+      const progress = Math.min((currentTime - startTime) / duration, 1);
+      const easeOut = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.floor(easeOut * end));
+      if (progress < 1) requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }, [end, duration]);
+
+  return count;
+}
 
 export default function Home() {
-  const [handle, setHandle] = useState("");
+  const router = useRouter();
+  const supabase = createClient();
+  
+  // Auth & UI State
+  const [session, setSession] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  
+  // Profile Management State
+  const [guestHandle, setGuestHandle] = useState("");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Database Stats State
+  const [dbStats, setDbStats] = useState({ inArena: 0, totalUsers: 0, avgWait: 0 });
+
+  const animatedArena = useAnimatedNumber(dbStats.inArena, 2000);
+  const animatedUsers = useAnimatedNumber(dbStats.totalUsers, 2500);
+  const animatedWait = useAnimatedNumber(dbStats.avgWait * 10, 1500) / 10;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    // Load previously saved guest handle
+    const savedGuest = localStorage.getItem("omoggle_guest_name");
+    if (savedGuest) setGuestHandle(savedGuest);
+
+    const fetchProfile = async (userId: string) => {
+      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (isMounted) {
+        if (data) {
+          setProfile(data);
+          setEditName(data.username);
+        }
+        setLoadingAuth(false);
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      if (isMounted) {
+        setSession(currentSession);
+        if (currentSession) {
+          fetchProfile(currentSession.user.id);
+        } else {
+          setProfile(null);
+          setLoadingAuth(false);
+        }
+      }
+    });
+
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      if (isMounted && currentSession && !profile) {
+        setSession(currentSession);
+        fetchProfile(currentSession.user.id);
+      } else if (isMounted && !currentSession) {
+        setLoadingAuth(false);
+      }
+    });
+
+    const fetchLiveStats = async () => {
+      try {
+        const { count: rankedCount } = await supabase.from('ranked_queue').select('*', { count: 'exact', head: true });
+        const { count: casualCount } = await supabase.from('arena_queue').select('*', { count: 'exact', head: true });
+        const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
+
+        const totalInArena = (rankedCount || 0) + (casualCount || 0);
+        if (isMounted) {
+          setDbStats({ inArena: totalInArena, totalUsers: userCount || 0, avgWait: totalInArena > 0 ? 1.2 : 4.2 });
+        }
+      } catch (error) { console.error("Stats Fetch Error", error); }
+    };
+    
+    fetchLiveStats();
+    const interval = setInterval(fetchLiveStats, 10000);
+    
+    return () => { isMounted = false; clearInterval(interval); subscription.unsubscribe(); };
+  }, [supabase, profile]);
+
+  const handleGoogleLogin = async () => {
+    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth/callback` } });
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setProfile(null);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim() || !session?.user?.id) return;
+    setIsSaving(true);
+    
+    try {
+      const elo = profile?.elo || 1200;
+      const tier = getTier(elo).label;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert({ 
+          id: session.user.id,
+          username: editName.trim(), 
+          avatar_url: session.user.user_metadata?.avatar_url || profile?.avatar_url || "",
+          elo: elo,
+          tier: tier
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setProfile(data);
+      setIsSettingsOpen(false);
+    } catch (error: any) {
+      console.error("Save Error:", error.message);
+      alert(`System Error: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleEnterArena = () => {
+    if (session) {
+      router.push("/lobby"); 
+    } else {
+      if (guestHandle.trim().length > 0) {
+        localStorage.setItem("omoggle_guest_name", guestHandle.trim());
+        router.push("/lobby");
+      } else {
+        setIsAuthModalOpen(true); 
+      }
+    }
+  };
+
+  // Derived UI Variables
+  const displayName = profile?.username || session?.user?.user_metadata?.full_name || "Mogger";
+  const displayAvatar = profile?.avatar_url || session?.user?.user_metadata?.avatar_url;
+  const displayElo = profile?.elo || 1200;
+  const tierInfo = getTier(displayElo);
 
   return (
-    <div className="min-h-screen flex flex-col items-center">
-      {/* Hero Section */}
-      <main className="flex flex-col items-center justify-center w-full max-w-4xl mx-auto px-6 py-24">
-        {/* Diamond Accent */}
-        <div className="flex items-center gap-2 mb-6 text-xs font-mono tracking-widest text-red-500 uppercase">
-          <span className="text-red-500">◆</span>
-          <span>FACE THE COMPETITION</span>
-          <span className="text-red-500">◆</span>
-        </div>
-
-        {/* Main Heading */}
-        <h1
-          className="text-center leading-none tracking-tight mb-8"
-          style={{ fontFamily: "var(--font-bebas)" }}
-        >
-          <span className="block text-8xl sm:text-9xl md:text-[140px] text-zinc-200">
-            MOG
-          </span>
-          <span className="block text-8xl sm:text-9xl md:text-[140px] text-red-500 text-glow-red">
-            OR
-          </span>
-          <span className="block text-8xl sm:text-9xl md:text-[140px] text-zinc-200">
-            BE MOGGED
-          </span>
-        </h1>
-
-        {/* Subtext */}
-        <p className="text-xs font-mono text-zinc-500 tracking-widest mb-12 text-center">
-          anonymous · real-time · unfiltered
-        </p>
-
-        {/* Live Counter */}
-        <div className="flex items-center gap-3 mb-12">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-          </span>
-          <span className="text-sm font-mono text-green-400">
-            2,847 IN ARENA
-          </span>
-        </div>
-
-        {/* Input & CTA */}
-        <div className="flex flex-col items-center gap-4 w-full max-w-md mb-16">
-          <input
-            type="text"
-            value={handle}
-            onChange={(e) => setHandle(e.target.value)}
-            placeholder="YOUR HANDLE"
-            className="w-full h-14 px-6 bg-zinc-900/50 border border-zinc-800 rounded-none text-center text-zinc-200 font-mono text-sm uppercase placeholder:text-zinc-600 focus:outline-none focus:border-red-500/50 transition-colors"
-          />
-          <button className="w-full h-14 bg-red-600 hover:bg-red-500 text-zinc-200 flex items-center justify-center gap-3 text-sm uppercase tracking-wider transition-colors rounded-none font-semibold">
-            <Swords className="w-5 h-5" />
-            ENTER THE ARENA
-          </button>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-3 gap-8 w-full max-w-lg mb-20">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-red-500 mb-1" style={{ fontFamily: "var(--font-bebas)" }}>
-              12.4M
+    <div style={{ minHeight: "100vh", backgroundColor: "#09090b", color: "white", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif", position: "relative", overflow: "hidden" }}>
+      
+      {/* --- DYNAMIC PROFILE PILL (Top Right) --- */}
+      <div style={{ position: "absolute", top: "24px", right: "24px", zIndex: 40 }}>
+        {loadingAuth ? (
+          <div style={{ width: "24px", height: "24px", border: "2px solid #27272a", borderTopColor: "#ef4444", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+        ) : session ? (
+          <div style={{ padding: "8px 16px", backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid #27272a", borderRadius: "99px", display: "flex", alignItems: "center", gap: "12px", backdropFilter: "blur(10px)", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }}>
+            <img src={displayAvatar} alt="Avatar" style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.1)", objectFit: "cover" }} />
+            <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
+              <span style={{ fontSize: "14px", fontWeight: "900", color: "white", lineHeight: "1" }}>{displayName}</span>
+              <span style={{ fontSize: "10px", color: "#a1a1aa", fontFamily: "monospace", marginTop: "2px" }}>
+                <span style={{ color: tierInfo.color, textShadow: tierInfo.glow, fontWeight: "bold" }}>{tierInfo.label}</span> • {displayElo} ELO
+              </span>
             </div>
-            <div className="text-xs font-mono text-zinc-500 uppercase tracking-wider">
-              Battles
-            </div>
+            <div style={{ width: "1px", height: "24px", backgroundColor: "#27272a", margin: "0 4px" }}></div>
+            <button onClick={() => setIsSettingsOpen(true)} style={{ background: "none", border: "none", color: "#71717a", cursor: "pointer", display: "flex", alignItems: "center", transition: "color 0.2s" }} onMouseOver={(e) => e.currentTarget.style.color = "white"} onMouseOut={(e) => e.currentTarget.style.color = "#71717a"}><Settings size={16} /></button>
+            <button onClick={handleLogout} style={{ background: "none", border: "none", color: "#71717a", cursor: "pointer", display: "flex", alignItems: "center", transition: "color 0.2s" }} onMouseOver={(e) => e.currentTarget.style.color = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.color = "#71717a"}><LogOut size={16} /></button>
           </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-red-500 mb-1" style={{ fontFamily: "var(--font-bebas)" }}>
-              98K
+        ) : (
+          <button onClick={() => setIsAuthModalOpen(true)} style={{ padding: "10px 24px", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "99px", color: "white", fontSize: "12px", fontWeight: "bold", cursor: "pointer", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.2s" }} onMouseOver={(e) => { e.currentTarget.style.backgroundColor = "white"; e.currentTarget.style.color = "black"; }} onMouseOut={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.03)"; e.currentTarget.style.color = "white"; }}><User size={16} /> SIGN IN</button>
+        )}
+      </div>
+
+      <style jsx global>{` @keyframes spin { 100% { transform: rotate(360deg); } } `}</style>
+
+      {/* --- HERO CONTENT --- */}
+      <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "4px", marginBottom: "30px", display: "flex", alignItems: "center", gap: "10px" }}><span>♦</span> FACE THE COMPETITION <span>♦</span></div>
+
+      <div style={{ textAlign: "center", lineHeight: "1.1", marginBottom: "30px" }}>
+        <h1 style={{ fontSize: "clamp(5rem, 15vw, 9rem)", fontWeight: "400", margin: 0, letterSpacing: "-2px" }}>MOG</h1>
+        <h1 style={{ fontSize: "clamp(5rem, 15vw, 9rem)", fontWeight: "400", margin: 0, color: "#ef4444", textShadow: "0 0 40px rgba(239, 68, 68, 0.6)" }}>OR</h1>
+        <h1 style={{ fontSize: "clamp(4rem, 12vw, 8rem)", fontWeight: "400", margin: 0, letterSpacing: "-2px" }}>BE MOGGED</h1>
+      </div>
+
+      <div style={{ color: "#71717a", fontSize: "12px", letterSpacing: "2px", marginBottom: "40px", fontFamily: "monospace" }}>anonymous • real-time • unfiltered</div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "50px" }}>
+        <div style={{ width: "10px", height: "10px", backgroundColor: "#22c55e", borderRadius: "50%", boxShadow: "0 0 10px #22c55e" }}></div>
+        <span style={{ color: "#22c55e", fontSize: "12px", fontWeight: "bold", letterSpacing: "1px" }}>{animatedArena.toLocaleString()} IN ARENA</span>
+      </div>
+
+      <div style={{ width: "100%", maxWidth: "400px", marginBottom: "80px", display: "flex", flexDirection: "column", gap: "15px" }}>
+        {!session && !loadingAuth && (
+          <input type="text" placeholder="ENTER GUEST HANDLE" value={guestHandle} onChange={(e) => setGuestHandle(e.target.value)} style={{ width: "100%", padding: "18px", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid #27272a", borderRadius: "12px", color: "white", textAlign: "center", fontSize: "16px", letterSpacing: "2px", outline: "none", fontFamily: "monospace", transition: "border-color 0.2s" }} onFocus={(e) => e.target.style.borderColor = "#ef4444"} onBlur={(e) => e.target.style.borderColor = "#27272a"} />
+        )}
+        <button onClick={handleEnterArena} style={{ width: "100%", padding: "20px", backgroundColor: "#ef4444", color: "white", border: "none", borderRadius: "12px", fontSize: "18px", fontWeight: "900", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", cursor: "pointer", transition: "all 0.2s", boxShadow: "0 0 30px rgba(239, 68, 68, 0.3)" }} onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.03)"} onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}><Swords size={24} /> {session ? "ENTER LOBBY" : "ENTER THE ARENA"}</button>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "center", gap: "clamp(30px, 8vw, 80px)", textAlign: "center" }}>
+        <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedUsers >= 1000 ? (animatedUsers / 1000).toFixed(1) + 'K' : animatedUsers}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>MOGGERS REGISTERED</div></div>
+        <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedArena}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>ACTIVE NOW</div></div>
+        <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedWait.toFixed(1)}S</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>AVG WAIT</div></div>
+      </div>
+
+      {/* --- SETTINGS MODAL --- */}
+      {isSettingsOpen && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(8px)" }}>
+          <div style={{ width: "100%", maxWidth: "420px", backgroundColor: "#0f0514", border: "1px solid #27272a", borderRadius: "24px", padding: "40px 30px", position: "relative", textAlign: "center" }}>
+            <button onClick={() => setIsSettingsOpen(false)} style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", color: "#71717a", cursor: "pointer" }}><X size={24} /></button>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: "900", color: "white", margin: "0 0 30px 0" }}>PROFILE SETTINGS</h2>
+            <div style={{ textAlign: "left", marginBottom: "30px" }}>
+              <label style={{ display: "block", color: "#a1a1aa", fontSize: "12px", fontWeight: "bold", marginBottom: "10px" }}>DISPLAY NAME</label>
+              <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={16} style={{ width: "100%", padding: "16px", backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid #27272a", borderRadius: "12px", color: "white", fontSize: "16px", outline: "none", fontFamily: "monospace" }} />
             </div>
-            <div className="text-xs font-mono text-zinc-500 uppercase tracking-wider">
-              Active
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="text-3xl font-bold text-red-500 mb-1" style={{ fontFamily: "var(--font-bebas)" }}>
-              4.2S
-            </div>
-            <div className="text-xs font-mono text-zinc-500 uppercase tracking-wider">
-              Avg Wait
-            </div>
+            <button onClick={handleSaveProfile} disabled={isSaving || !editName.trim()} style={{ width: "100%", padding: "16px", backgroundColor: "white", color: "black", border: "none", borderRadius: "12px", fontSize: "16px", fontWeight: "bold", cursor: "pointer", opacity: (!editName.trim() || isSaving) ? 0.5 : 1 }}>{isSaving ? "SAVING..." : "SAVE CHANGES"}</button>
           </div>
         </div>
+      )}
 
-        {/* Leaderboard */}
-        <div className="w-full max-w-lg">
-          <h2
-            className="text-2xl uppercase mb-6 tracking-tight text-center"
-            style={{ fontFamily: "var(--font-bebas)" }}
-          >
-            Top Mogs
-          </h2>
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-none overflow-hidden">
-            {leaderboardData.map((player, index) => (
-              <div
-                key={player.rank}
-                className={`flex items-center justify-between px-6 py-4 ${
-                  index !== leaderboardData.length - 1
-                    ? "border-b border-zinc-800"
-                    : ""
-                } hover:bg-zinc-800/50 transition-colors`}
-              >
-                <div className="flex items-center gap-4">
-                  <span className="w-8 text-center font-mono text-zinc-500">
-                    {player.rank}
-                  </span>
-                  {player.rank === 1 && <Crown className="w-4 h-4 text-yellow-400" />}
-                  {player.rank === 2 && <Medal className="w-4 h-4 text-zinc-300" />}
-                  {player.rank === 3 && <Trophy className="w-4 h-4 text-amber-600" />}
-                  {player.rank > 3 && <div className="w-4" />}
-                  <span className="font-mono text-sm text-zinc-200">
-                    {player.username}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="font-mono text-sm text-zinc-400">
-                    {player.score.toLocaleString()}
-                  </span>
-                  <span className={`text-xs font-mono uppercase ${player.tierColor}`}>
-                    {player.tier}
-                  </span>
-                </div>
-              </div>
-            ))}
+      {/* --- AUTH MODAL --- */}
+      {isAuthModalOpen && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(8px)" }}>
+          <div style={{ width: "100%", maxWidth: "420px", backgroundColor: "#0f0514", border: "1px solid rgba(168, 85, 247, 0.3)", borderRadius: "24px", padding: "40px 30px", position: "relative", textAlign: "center" }}>
+            <button onClick={() => setIsAuthModalOpen(false)} style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", color: "#71717a", cursor: "pointer" }}><X size={24} /></button>
+            <h2 style={{ fontSize: "2rem", fontWeight: "900", color: "white", margin: "0 0 20px 0" }}>CLAIM YOUR RANK</h2>
+            <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.6", margin: "0 0 25px 0" }}>Continue with Google to save your Elo, history, and leaderboard identity.</p>
+            <button onClick={handleGoogleLogin} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "15px", padding: "16px", backgroundColor: "white", color: "black", border: "none", borderRadius: "12px", fontSize: "16px", fontWeight: "bold", cursor: "pointer" }}><svg width="24" height="24" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> Continue with Google</button>
           </div>
         </div>
-      </main>
+      )}
     </div>
   );
 }

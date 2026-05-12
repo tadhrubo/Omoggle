@@ -1,133 +1,145 @@
 "use client";
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import Peer, { MediaConnection, DataConnection } from "peerjs";
 import { createClient } from "@/lib/supabase";
 
-export interface Profile {
-  name: string;
-  elo: number;
-  tier: string;
+interface MatchmakerProps {
+  mode?: "casual" | "ranked";
+  playerElo?: number;
+  onDisconnect?: () => void;
 }
 
-export function useMatchmaker({ onDisconnect }: { onDisconnect?: () => void } = {}) {
+export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect }: MatchmakerProps = {}) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isSearching, setIsSearching] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
-  const [peerId, setPeerId] = useState<string | null>(null);
   const [opponentScore, setOpponentScore] = useState<number | null>(null);
   const [liveOpponentScore, setLiveOpponentScore] = useState<number | null>(null);
-  const [remoteProfile, setRemoteProfile] = useState<Profile | null>(null);
+  const [remoteProfile, setRemoteProfile] = useState<any>(null);
 
   const peerRef = useRef<Peer | null>(null);
   const callRef = useRef<MediaConnection | null>(null);
   const dataConnRef = useRef<DataConnection | null>(null);
+  const searchRadius = useRef<number>(50); 
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // NEW: Keep a hard reference to the camera stream to kill it on unmount
+  const streamRef = useRef<MediaStream | null>(null); 
+  
   const supabase = createClient();
-
-  const handleCallClose = useCallback(() => {
-    setRemoteStream(null);
-    setIsConnected(false);
-    setOpponentScore(null);
-    setLiveOpponentScore(null);
-    setRemoteProfile(null);
-    setIsSearching(true);
-    if (onDisconnect) onDisconnect();
-    if (peerRef.current && localStream) {
-      findMatchInternal(peerRef.current, localStream);
-    }
-  }, [localStream, onDisconnect]);
 
   const setupDataConnection = useCallback((conn: DataConnection) => {
     dataConnRef.current = conn;
     conn.on("data", (data: any) => {
       if (!data || !data.type) return;
-
-      if (data.type === "PROFILE_SYNC") {
-        setRemoteProfile(data.profile);
-      } else if (data.type === "LIVE_SCORE") {
-        setLiveOpponentScore(data.score);
-      } else if (data.type === "FINAL_SCORE") {
-        setOpponentScore(data.score);
-        setLiveOpponentScore(null);
-      }
+      if (data.type === "PROFILE_SYNC") setRemoteProfile(data.profile);
+      if (data.type === "LIVE_SCORE") setLiveOpponentScore(data.score);
+      if (data.type === "FINAL_SCORE") setOpponentScore(data.score);
     });
   }, []);
 
-  const sendTelemetry = useCallback((type: string, payload: any) => {
-    if (dataConnRef.current?.open) {
-      dataConnRef.current.send({ type, ...payload });
-    }
-  }, []);
+  const pollForRankedMatch = async (peer: Peer, stream: MediaStream) => {
+    if (!peer.id) return;
 
-  const findMatchInternal = useCallback(async (peer: Peer, stream: MediaStream) => {
-    setIsSearching(true);
+    const minElo = playerElo - searchRadius.current;
+    const maxElo = playerElo + searchRadius.current;
 
-    // Clean old entries
-    await supabase.from("arena_queue").delete().eq("peer_id", peer.id);
-
-    // Look for opponent
-    const { data } = await supabase.from("arena_queue").select("*").neq("peer_id", peer.id).limit(1);
+    const { data } = await supabase
+      .from("ranked_queue")
+      .select("*")
+      .neq("peer_id", peer.id)
+      .gte("elo", minElo)
+      .lte("elo", maxElo)
+      .order("joined_at", { ascending: true }) 
+      .limit(1);
 
     if (data && data.length > 0) {
       const opponentId = data[0].peer_id;
-      await supabase.from("arena_queue").delete().eq("peer_id", opponentId);
+      
+      const { error } = await supabase.from("ranked_queue").delete().eq("peer_id", opponentId);
+      if (error) return; 
+
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      await supabase.from("ranked_queue").delete().eq("peer_id", peer.id);
 
       const call = peer.call(opponentId, stream);
       callRef.current = call;
-
-      const ghostTimeout = setTimeout(() => {
-        console.warn("Ghost detected. Retrying...");
-        call.close();
-        findMatchInternal(peer, stream);
-      }, 3000);
-
       call.on("stream", (remoteMedia) => {
-        clearTimeout(ghostTimeout);
         setRemoteStream(remoteMedia);
         setIsConnected(true);
         setIsSearching(false);
       });
-      call.on("close", handleCallClose);
 
       const conn = peer.connect(opponentId);
       setupDataConnection(conn);
     } else {
-      await supabase.from("arena_queue").insert([{ peer_id: peer.id }]);
+      if (searchRadius.current < 500) {
+        searchRadius.current += 25;
+      }
     }
-  }, [handleCallClose, setupDataConnection, supabase]);
+  };
+
+  const findMatchInternal = async (peer: Peer, stream: MediaStream) => {
+    setIsSearching(true);
+    
+    if (mode === "ranked") {
+      await supabase.from("ranked_queue").delete().eq("peer_id", peer.id);
+      await supabase.from("ranked_queue").insert([{ peer_id: peer.id, elo: playerElo }]);
+      
+      pollIntervalRef.current = setInterval(() => {
+        pollForRankedMatch(peer, stream);
+      }, 3000);
+
+    } else {
+      await supabase.from("arena_queue").delete().eq("peer_id", peer.id);
+      const { data } = await supabase.from("arena_queue").select("*").neq("peer_id", peer.id).limit(1);
+
+      if (data && data.length > 0) {
+        const opponentId = data[0].peer_id;
+        await supabase.from("arena_queue").delete().eq("peer_id", opponentId);
+
+        const call = peer.call(opponentId, stream);
+        callRef.current = call;
+        call.on("stream", (remoteMedia) => {
+          setRemoteStream(remoteMedia);
+          setIsConnected(true);
+          setIsSearching(false);
+        });
+
+        const conn = peer.connect(opponentId);
+        setupDataConnection(conn);
+      } else {
+        await supabase.from("arena_queue").insert([{ peer_id: peer.id }]);
+      }
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
-    let activeStream: MediaStream | null = null;
-    let newPeer: Peer | null = null;
-
     const init = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        
+        // Edge case: If user clicks "Back" before the camera even turns on
         if (!isMounted) {
-          stream.getTracks().forEach(t => t.stop());
+          stream.getTracks().forEach(track => track.stop());
           return;
         }
-        activeStream = stream;
+
         setLocalStream(stream);
+        streamRef.current = stream; // Save to ref for cleanup
 
-        newPeer = new Peer({
-          host: "localhost",
-          port: 9000,
-          path: "/",
-          secure: false,
-          debug: 2
+        const uniqueId = "user_" + Math.random().toString(36).substr(2, 9);
+        const peer = new Peer(uniqueId, { host: "localhost", port: 9000, path: "/", secure: false });
+        peerRef.current = peer;
+
+        peer.on("open", () => {
+          if (isMounted) findMatchInternal(peer, stream);
         });
 
-        newPeer.on("open", (id) => {
-          if (!isMounted || !newPeer) return;
-          setPeerId(id);
-          peerRef.current = newPeer;
-          findMatchInternal(newPeer, stream);
-        });
-
-        newPeer.on("call", (call) => {
+        peer.on("call", (call) => {
+          if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); 
           call.answer(stream);
           callRef.current = call;
           call.on("stream", (remoteMedia) => {
@@ -135,47 +147,43 @@ export function useMatchmaker({ onDisconnect }: { onDisconnect?: () => void } = 
             setIsConnected(true);
             setIsSearching(false);
           });
-          call.on("close", handleCallClose);
         });
 
-        newPeer.on("connection", (conn) => {
-          setupDataConnection(conn);
-        });
+        peer.on("connection", setupDataConnection);
 
-      } catch (e) {
-        console.error("Initialization failed:", e);
+      } catch (e) { 
+        console.error("Media Device Error:", e); 
       }
     };
 
     init();
-
-    return () => {
+    
+    // COMPLETE TEARDOWN ON UNMOUNT
+    return () => { 
       isMounted = false;
-      if (activeStream) activeStream.getTracks().forEach(t => t.stop());
-      if (newPeer) {
-        if (newPeer.id) supabase.from("arena_queue").delete().eq("peer_id", newPeer.id);
-        newPeer.destroy();
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      
+      // 1. Kill the Camera Hardware
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+
+      // 2. Kill the Peer Connection & Queue
+      if (peerRef.current) {
+        const id = peerRef.current.id;
+        if (id) {
+          // Fire and forget deletes
+          supabase.from("arena_queue").delete().eq("peer_id", id).then();
+          supabase.from("ranked_queue").delete().eq("peer_id", id).then();
+        }
+        peerRef.current.destroy();
       }
     };
-  }, []);
+  }, [setupDataConnection, mode, playerElo]);
 
-  const skip = async () => {
-    if (callRef.current) callRef.current.close();
-    else if (peerRef.current && localStream) findMatchInternal(peerRef.current, localStream);
+  const sendTelemetry = (type: string, payload: any) => {
+    if (dataConnRef.current?.open) dataConnRef.current.send({ type, ...payload });
   };
 
-  return {
-    localStream,
-    remoteStream,
-    isSearching,
-    isConnected,
-    peerId,
-    opponentScore,
-    liveOpponentScore,
-    remoteProfile,
-    skip,
-    hangUp: skip,
-    sendTelemetry,
-    sendScore: (score: number) => sendTelemetry("FINAL_SCORE", { score })
-  };
+  return { localStream, remoteStream, isSearching, isConnected, opponentScore, liveOpponentScore, remoteProfile, sendTelemetry, skip: () => window.location.reload() };
 }
