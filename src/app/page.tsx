@@ -136,9 +136,17 @@ export default function Home() {
 
   const handleSaveProfile = async () => {
     if (!editName.trim() || !session?.user?.id) return;
+    
+    // DEBUG: Add this line temporarily. 
+    // If it logs "undefined" in your browser console, Vercel hasn't baked the keys in.
+    console.log("Saving with Key:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.slice(0, 5) + "...");
+
     setIsSaving(true);
     
     try {
+      // Re-initialize client inside the function to ensure fresh env vars
+      const supabase = createClient(); 
+      
       const elo = profile?.elo || 1200;
       const tier = getTier(elo).label;
 
@@ -154,7 +162,11 @@ export default function Home() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // If the error is still "Invalid API Key", we know the headers are missing
+        throw new Error(error.message);
+      }
+      
       setProfile(data);
       setIsSettingsOpen(false);
     } catch (error: any) {
@@ -164,7 +176,6 @@ export default function Home() {
       setIsSaving(false);
     }
   };
-
   const handleEnterArena = () => {
     // Check if user is banned
     if (profile?.is_banned) {

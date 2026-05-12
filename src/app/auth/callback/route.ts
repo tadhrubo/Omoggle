@@ -29,7 +29,7 @@ export async function GET(request: Request) {
        return NextResponse.redirect(`${origin}/?error=missing_env_vars`);
     }
 
-    const supabase = createServerClient(
+    const supabase = await createServerClient(
       supabaseUrl,
       supabaseAnonKey,
       {

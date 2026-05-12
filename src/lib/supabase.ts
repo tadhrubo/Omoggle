@@ -1,7 +1,7 @@
 import { createBrowserClient, createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-// 1. CLIENT for use in "use client" components (Browser)
+// 1. Browser Client (Stay the same)
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,9 +9,10 @@ export function createClient() {
   );
 }
 
-// 2. CLIENT for use in Route Handlers & Server Actions (Server)
-export function createServerSupabaseClient() {
-  const cookieStore = cookies();
+// 2. Server Client (Updated to be Async)
+export async function createServerSupabaseClient() {
+  // CRITICAL: Next.js 15 requires awaiting cookies()
+  const cookieStore = await cookies(); 
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,9 +28,7 @@ export function createServerSupabaseClient() {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
+            // Usually ignored if called from a Server Component
           }
         },
       },
