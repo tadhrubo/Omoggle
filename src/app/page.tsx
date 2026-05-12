@@ -119,8 +119,14 @@ export default function Home() {
   }, [supabase, profile]);
 
   const handleGoogleLogin = async () => {
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth/callback` } });
-  };
+  await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      // Use window.location.origin to stay dynamic across environments
+      redirectTo: `${window.location.origin}/auth/callback`
+    }
+  });
+};
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
