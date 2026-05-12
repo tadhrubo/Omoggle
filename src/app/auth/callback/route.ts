@@ -8,17 +8,30 @@ export async function GET(request: Request) {
   const errorDescription = searchParams.get('error_description');
   const next = searchParams.get('next') ?? '/';
 
-  // If Supabase itself threw an error (like unverified email or URI mismatch)
+  /**
+   * ARCHITECTURAL FIX: 
+   * We redirect to '/' instead of '/login' because we don't have a login page.
+   * This prevents the 404 error you were seeing.
+   */
   if (errorDescription) {
-    return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(errorDescription)}`);
+    return NextResponse.redirect(`${origin}/?error=${encodeURIComponent(errorDescription)}`);
   }
 
   if (code) {
     const cookieStore = await cookies();
     
+    // We check if keys exist to avoid crashing the server if Vercel hasn't picked them up yet
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+       console.error("CRITICAL: Supabase Environment Variables are missing in production.");
+       return NextResponse.redirect(`${origin}/?error=missing_env_vars`);
+    }
+
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      supabaseUrl,
+      supabaseAnonKey,
       {
         cookies: {
           getAll() {
@@ -30,7 +43,8 @@ export async function GET(request: Request) {
                 cookieStore.set(name, value, options);
               });
             } catch (error) {
-              console.error("Cookie Set Error:", error);
+              // The `setAll` method was called from a Server Component.
+              // This can be ignored if you have middleware refreshing user sessions.
             }
           },
         },
@@ -40,15 +54,15 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (!error) {
-      // Success! Send them to the lobby.
+      // Success! Send them to the lobby or whatever 'next' is.
       return NextResponse.redirect(`${origin}${next}`);
     } else {
-      // If code exchange fails, print the exact error to the URL
       console.error("Auth Callback Error:", error.message);
-      return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
+      // Redirect to home page with the actual error message
+      return NextResponse.redirect(`${origin}/?error=${encodeURIComponent(error.message)}`);
     }
   }
 
   // Fallback if no code is present
-  return NextResponse.redirect(`${origin}/login?error=no-code-provided`);
+  return NextResponse.redirect(`${origin}/?error=no-code-provided`);
 }
