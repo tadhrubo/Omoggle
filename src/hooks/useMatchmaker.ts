@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import Peer, { MediaConnection, DataConnection } from "peerjs";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 interface MatchmakerProps {
   mode?: "casual" | "ranked";
