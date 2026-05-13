@@ -39,7 +39,9 @@ function useAnimatedNumber(end: number, duration: number = 2000) {
 
 export default function Home() {
   const router = useRouter();
-  const supabase = createClient();
+  
+  // ARCHITECT FIX: Stabilize the Supabase client so it doesn't re-create on every keystroke
+  const [supabase] = useState(() => createClient());
   
   // Auth & UI State
   const [session, setSession] = useState<any>(null);
@@ -67,38 +69,43 @@ export default function Home() {
     const savedGuest = localStorage.getItem("omoggle_guest_name");
     if (savedGuest) setGuestHandle(savedGuest);
 
-    const fetchProfile = async (userId: string) => {
-      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      if (isMounted) {
-        if (data) {
+    // Initial Load Logic
+    const loadUserAndProfile = async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      if (currentSession && isMounted) {
+        setSession(currentSession);
+        const { data } = await supabase.from('profiles').select('*').eq('id', currentSession.user.id).single();
+        if (data && isMounted) {
           setProfile(data);
-          setEditName(data.username);
+          setEditName(data.username); // This now only fires ONCE when the page loads
         }
-        setLoadingAuth(false);
       }
+      if (isMounted) setLoadingAuth(false);
     };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+    loadUserAndProfile();
+
+    // Listen for Auth Changes (Login/Logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       if (isMounted) {
-        setSession(currentSession);
-        if (currentSession) {
-          fetchProfile(currentSession.user.id);
-        } else {
+        if (event === 'SIGNED_IN' && currentSession) {
+          setSession(currentSession);
+          // Only fetch the profile if it's a fresh sign-in
+          supabase.from('profiles').select('*').eq('id', currentSession.user.id).single().then(({ data }) => {
+            if (data && isMounted) {
+              setProfile(data);
+              setEditName(data.username);
+            }
+          });
+        } else if (event === 'SIGNED_OUT') {
+          setSession(null);
           setProfile(null);
-          setLoadingAuth(false);
         }
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      if (isMounted && currentSession && !profile) {
-        setSession(currentSession);
-        fetchProfile(currentSession.user.id);
-      } else if (isMounted && !currentSession) {
-        setLoadingAuth(false);
-      }
-    });
-
+    // Background Stats Polling
     const fetchLiveStats = async () => {
       try {
         const { count: rankedCount } = await supabase.from('ranked_queue').select('*', { count: 'exact', head: true });
@@ -109,24 +116,30 @@ export default function Home() {
         if (isMounted) {
           setDbStats({ inArena: totalInArena, totalUsers: userCount || 0, avgWait: totalInArena > 0 ? 1.2 : 4.2 });
         }
-      } catch (error) { console.error("Stats Fetch Error", error); }
+      } catch (error) { 
+        console.error("Stats Fetch Error", error); 
+      }
     };
     
     fetchLiveStats();
     const interval = setInterval(fetchLiveStats, 10000);
     
-    return () => { isMounted = false; clearInterval(interval); subscription.unsubscribe(); };
-  }, [supabase, profile]);
+    // Cleanup
+    return () => { 
+      isMounted = false; 
+      clearInterval(interval); 
+      subscription.unsubscribe(); 
+    };
+  }, [supabase]); // ARCHITECT FIX: Removed 'profile' from dependencies. This stops the infinite loop!
 
   const handleGoogleLogin = async () => {
-  await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      // Use window.location.origin to stay dynamic across environments
-      redirectTo: `${window.location.origin}/auth/callback`
-    }
-  });
-};
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
+    });
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -137,16 +150,9 @@ export default function Home() {
   const handleSaveProfile = async () => {
     if (!editName.trim() || !session?.user?.id) return;
     
-    // DEBUG: Add this line temporarily. 
-    // If it logs "undefined" in your browser console, Vercel hasn't baked the keys in.
-    console.log("Saving with Key:", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.slice(0, 5) + "...");
-
     setIsSaving(true);
     
     try {
-      // Re-initialize client inside the function to ensure fresh env vars
-      const supabase = createClient(); 
-      
       const elo = profile?.elo || 1200;
       const tier = getTier(elo).label;
 
@@ -162,10 +168,7 @@ export default function Home() {
         .select()
         .single();
 
-      if (error) {
-        // If the error is still "Invalid API Key", we know the headers are missing
-        throw new Error(error.message);
-      }
+      if (error) throw new Error(error.message);
       
       setProfile(data);
       setIsSettingsOpen(false);
@@ -176,8 +179,8 @@ export default function Home() {
       setIsSaving(false);
     }
   };
+
   const handleEnterArena = () => {
-    // Check if user is banned
     if (profile?.is_banned) {
       alert("Your account has been suspended. Contact support for assistance.");
       return;
@@ -217,7 +220,17 @@ export default function Home() {
               </span>
             </div>
             <div style={{ width: "1px", height: "24px", backgroundColor: "#27272a", margin: "0 4px" }}></div>
-            <button onClick={() => setIsSettingsOpen(true)} style={{ background: "none", border: "none", color: "#71717a", cursor: "pointer", display: "flex", alignItems: "center", transition: "color 0.2s" }} onMouseOver={(e) => e.currentTarget.style.color = "white"} onMouseOut={(e) => e.currentTarget.style.color = "#71717a"}><Settings size={16} /></button>
+            <button 
+              onClick={() => {
+                setEditName(profile?.username || ""); // Resets input to actual name when opening modal
+                setIsSettingsOpen(true);
+              }} 
+              style={{ background: "none", border: "none", color: "#71717a", cursor: "pointer", display: "flex", alignItems: "center", transition: "color 0.2s" }} 
+              onMouseOver={(e) => e.currentTarget.style.color = "white"} 
+              onMouseOut={(e) => e.currentTarget.style.color = "#71717a"}
+            >
+              <Settings size={16} />
+            </button>
             <button onClick={handleLogout} style={{ background: "none", border: "none", color: "#71717a", cursor: "pointer", display: "flex", alignItems: "center", transition: "color 0.2s" }} onMouseOver={(e) => e.currentTarget.style.color = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.color = "#71717a"}><LogOut size={16} /></button>
           </div>
         ) : (
