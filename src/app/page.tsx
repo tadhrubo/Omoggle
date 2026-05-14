@@ -212,12 +212,19 @@ export default function Home() {
           <div style={{ width: "24px", height: "24px", border: "2px solid #27272a", borderTopColor: "#ef4444", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
         ) : session ? (
           <div style={{ padding: "8px 16px", backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid #27272a", borderRadius: "99px", display: "flex", alignItems: "center", gap: "12px", backdropFilter: "blur(10px)", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }}>
-            <img src={displayAvatar} alt="Avatar" style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.1)", objectFit: "cover" }} />
-            <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
-              <span style={{ fontSize: "14px", fontWeight: "900", color: "white", lineHeight: "1" }}>{displayName}</span>
-              <span style={{ fontSize: "10px", color: "#a1a1aa", fontFamily: "monospace", marginTop: "2px" }}>
-                <span style={{ color: tierInfo.color, textShadow: tierInfo.glow, fontWeight: "bold" }}>{tierInfo.label}</span> • {displayElo} ELO
-              </span>
+            <div 
+              onClick={() => router.push(`/profile/${session.user.id}`)}
+              style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", transition: "opacity 0.2s" }}
+              onMouseOver={(e) => e.currentTarget.style.opacity = "0.7"}
+              onMouseOut={(e) => e.currentTarget.style.opacity = "1"}
+            >
+              <img src={displayAvatar} alt="Avatar" style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.1)", objectFit: "cover" }} />
+              <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
+                <span style={{ fontSize: "14px", fontWeight: "900", color: "white", lineHeight: "1" }}>{displayName}</span>
+                <span style={{ fontSize: "10px", color: "#a1a1aa", fontFamily: "monospace", marginTop: "2px" }}>
+                  <span style={{ color: tierInfo.color, textShadow: tierInfo.glow, fontWeight: "bold" }}>{tierInfo.label}</span> • {displayElo} ELO
+                </span>
+              </div>
             </div>
             <div style={{ width: "1px", height: "24px", backgroundColor: "#27272a", margin: "0 4px" }}></div>
             <button 

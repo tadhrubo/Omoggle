@@ -206,7 +206,17 @@ export default function Lobby() {
               >GLOBAL RANKS</button>
             </div>
           </div>
-          <button className="enter-arena-btn" onClick={() => router.push("/arena")} style={{ backgroundColor: "#ef4444", color: "white", fontWeight: "900", padding: "12px 30px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "14px", marginBottom: "15px" }}>ENTER ARENA</button>
+          <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
+            {currentUserId && (
+              <button onClick={() => router.push(`/profile/${currentUserId}`)} style={{ backgroundColor: "rgba(255,255,255,0.05)", color: "white", fontWeight: "bold", padding: "12px 20px", borderRadius: "8px", border: "1px solid #27272a", cursor: "pointer", fontSize: "14px", transition: "background 0.2s" }}
+                onMouseOver={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"}
+                onMouseOut={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)"}
+              >
+                MY PROFILE
+              </button>
+            )}
+            <button className="enter-arena-btn" onClick={() => router.push("/arena")} style={{ backgroundColor: "#ef4444", color: "white", fontWeight: "900", padding: "12px 30px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "14px" }}>ENTER ARENA</button>
+          </div>
         </header>
 
         <div className="lobby-grid">
