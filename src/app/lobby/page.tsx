@@ -193,7 +193,7 @@ export default function Lobby() {
       <div className="lobby-container">
         
         {/* Header & Tab Switcher */}
-        <header className="lobby-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "50px", borderBottom: "1px solid #18181b" }}>
+        <header className="lobby-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "50px", borderBottom: "1px solid #18181b", paddingLeft: "70px" }}>
           <div>
             <div className="lobby-tabs" style={{ display: "flex", gap: "30px" }}>
               <button 

@@ -73,7 +73,7 @@ export default function LeaderboardPage() {
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#09090b", padding: "20px" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "30px", padding: "0 10px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "30px", padding: "0 10px 0 75px" }}>
         <button onClick={() => router.push("/lobby")} style={{ color: "#71717a", background: "none", border: "none", cursor: "pointer", fontFamily: "monospace", fontSize: "14px" }}>← LOBBY</button>
         <h1 style={{ color: "white", fontWeight: 900, fontSize: "24px", letterSpacing: "3px", margin: 0 }}>GLOBAL RANKINGS</h1>
         <div style={{ width: "60px" }}></div>

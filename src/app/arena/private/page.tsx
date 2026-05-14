@@ -211,7 +211,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
       )}
 
       {/* Header */}
-      <div style={{ flex: "none", height: "60px", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px", borderBottom: "1px solid #27272a" }}>
+      <div style={{ flex: "none", height: "60px", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px 0 85px", borderBottom: "1px solid #27272a" }}>
         <button onClick={() => router.push("/lobby")} style={{ color: "#71717a", background: "none", border: "none", cursor: "pointer", fontFamily: "monospace" }}>← LOBBY</button>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <h1 style={{ color: "#22c55e", fontWeight: "900", letterSpacing: "2px", margin: 0, fontSize: "20px" }}>PRIVATE ROOM</h1>

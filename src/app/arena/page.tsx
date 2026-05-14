@@ -249,7 +249,7 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
       )}
 
       {/* DYNAMIC Header */}
-      <div style={{ flex: "none", height: "60px", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px", borderBottom: "1px solid #27272a" }}>
+      <div style={{ flex: "none", height: "60px", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px 0 85px", borderBottom: "1px solid #27272a" }}>
         <button onClick={() => router.push("/lobby")} style={{ color: "#71717a", background: "none", border: "none", cursor: "pointer", fontFamily: "monospace" }}>← LOBBY</button>
         <h1 style={{ color: mode === "ranked" ? "#fbbf24" : "#ef4444", fontWeight: "900", letterSpacing: "2px", margin: 0, fontSize: "20px" }}>
           {mode === "ranked" ? "RANKED ARENA" : "CASUAL 1V1"}
