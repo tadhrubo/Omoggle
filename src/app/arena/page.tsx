@@ -177,11 +177,15 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
                   
                   setEloResult({ newElo, change: eloChange });
 
-                  // Persist: ELO + Match Record (Ranked + Authenticated only)
+                  // Persist: Stats + Match Record (Ranked + Authenticated only)
                   if (mode === "ranked" && localProfile.id) {
-                    supabase.from('profiles').update({
-                      elo: newElo
-                    }).eq('id', localProfile.id).then(() => console.log("Ranked Match Reported."));
+                    // Atomic stats update via RPC
+                    supabase.rpc('update_post_match_stats', {
+                      p_user_id: localProfile.id,
+                      p_new_elo: newElo,
+                      p_is_winner: isWinner,
+                      p_mode: mode
+                    }).then(() => console.log("Stats updated."));
 
                     // Save match to history
                     supabase.from('matches').insert([{
@@ -192,6 +196,25 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
                       elo_change: Math.abs(eloChange),
                       mode: mode
                     }]).then(() => console.log("Match record saved."));
+
+                    // Nemesis detection: if we broke opponent's 5+ streak
+                    if (isWinner && remoteProfile?.id && (remoteProfile?.current_streak || 0) >= 5) {
+                      supabase.from('nemeses').upsert([{
+                        user_id: remoteProfile.id,
+                        nemesis_id: localProfile.id,
+                        reason: 'streak_breaker'
+                      }], { onConflict: 'user_id,nemesis_id' }).then(() => console.log("Nemesis tagged."));
+                    }
+
+                    // Also update opponent stats if they're authenticated
+                    if (remoteProfile?.id) {
+                      supabase.rpc('update_post_match_stats', {
+                        p_user_id: remoteProfile.id,
+                        p_new_elo: calculateEloUpdate(oppElo, localProfile.elo, !isWinner).newElo,
+                        p_is_winner: !isWinner,
+                        p_mode: mode
+                      }).then();
+                    }
                   }
                 }
               }
@@ -324,7 +347,7 @@ function ArenaDataLoader() {
   const mode = (searchParams.get("mode") as "casual" | "ranked") || "casual";
   const supabase = createClient();
   
-  const [localProfile, setLocalProfile] = useState<{ id: string | null, name: string, elo: number, tier: string } | null>(null);
+  const [localProfile, setLocalProfile] = useState<{ id: string | null, name: string, elo: number, tier: string, current_streak: number } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -342,7 +365,8 @@ function ArenaDataLoader() {
               id: session.user.id,
               name: name,
               elo: data?.elo || 1200,
-              tier: data?.tier || "Silver"
+              tier: data?.tier || "Silver",
+              current_streak: data?.current_streak || 0
             });
           }
         } else {
@@ -353,7 +377,8 @@ function ArenaDataLoader() {
               id: null,
               name: savedGuestName || ("Guest_" + Math.floor(Math.random() * 1000)),
               elo: 1200,
-              tier: "Silver"
+              tier: "Silver",
+              current_streak: 0
             });
           }
         }
@@ -364,7 +389,8 @@ function ArenaDataLoader() {
             id: null,
             name: savedGuestName || ("Guest_" + Math.floor(Math.random() * 1000)),
             elo: 1200,
-            tier: "Silver"
+            tier: "Silver",
+            current_streak: 0
           });
         }
       }

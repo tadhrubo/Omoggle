@@ -122,7 +122,10 @@ export default function LeaderboardPage() {
           const tierColor = TIER_COLORS[entry.tier] || "#c0c0c0";
 
           return (
-            <div key={entry.id} style={{ display: "grid", gridTemplateColumns: "50px 1fr 80px 80px", padding: "12px 20px", alignItems: "center", borderBottom: "1px solid #18181b", transition: "background 0.2s" }}>
+            <div key={entry.id} onClick={() => router.push(`/profile/${entry.id}`)} style={{ display: "grid", gridTemplateColumns: "50px 1fr 80px 80px", padding: "12px 20px", alignItems: "center", borderBottom: "1px solid #18181b", transition: "background 0.2s", cursor: "pointer" }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.03)"}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+            >
               <span style={{ color: "#52525b", fontFamily: "monospace", fontSize: "12px" }}>#{rank}</span>
               <span style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{entry.username}</span>
               <span style={{ color: "#a1a1aa", fontFamily: "monospace", fontSize: "12px", textAlign: "right" }}>{entry.elo}</span>

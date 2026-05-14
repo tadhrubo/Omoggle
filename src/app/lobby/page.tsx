@@ -248,7 +248,10 @@ export default function Lobby() {
                 {leaderboard.map((user, i) => {
                    const rank = getRankStyle(user.tier);
                    return (
-                    <div key={user.id} style={{ display: "flex", justifyContent: "space-between", padding: "15px 0", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                    <div key={user.id} onClick={() => router.push(`/profile/${user.id}`)} style={{ display: "flex", justifyContent: "space-between", padding: "15px 0", borderBottom: "1px solid rgba(255,255,255,0.03)", cursor: "pointer", transition: "opacity 0.2s" }}
+                      onMouseOver={(e) => e.currentTarget.style.opacity = "0.7"}
+                      onMouseOut={(e) => e.currentTarget.style.opacity = "1"}
+                    >
                       <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
                         <span style={{ color: i < 3 ? "#fbbf24" : "#3f3f46", fontWeight: "900", fontSize: "18px" }}>{i + 1}</span>
                         <span style={{ fontWeight: "bold", fontSize: "16px" }}>{user.username}</span>
