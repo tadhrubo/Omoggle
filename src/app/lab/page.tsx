@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, FlaskConical, Scan, Loader2, RefreshCw } from "lucide-react";
 import { useFaceScanner } from "@/hooks/useFaceScanner";
 import { calculateMogScore, type MogScoreResult } from "@/utils/faceMath";
+import { FaceLandmarker, DrawingUtils } from "@mediapipe/tasks-vision";
 import CameraCheckModal from "@/app/components/CameraCheckModal";
 
 type LabState = "initializing" | "ready" | "scanning" | "result";
@@ -118,21 +119,15 @@ export default function Lab() {
           // Draw Landmarks if they exist
           if (result && result.faceLandmarks && result.faceLandmarks.length > 0) {
             const landmarks = result.faceLandmarks[0]; // Get the first face
+            const drawingUtils = new DrawingUtils(ctx);
+            const style = { color: "rgba(0, 255, 0, 0.4)", lineWidth: 1 };
 
-            ctx.fillStyle = "#39FF14"; // Neon Green
-            ctx.globalAlpha = 0.8;
-
-            // Draw the specific points (we don't need all 468, just a subset to look cool)
-            landmarks.forEach((point) => {
-              // Map normalized coordinates (0-1) to actual canvas pixels
-              // Mirror horizontally: x' = canvas.width - (x * canvas.width)
-              const x = canvas.width - (point.x * canvas.width);
-              const y = point.y * canvas.height;
-
-              ctx.beginPath();
-              ctx.arc(x, y, 2, 0, 2 * Math.PI);
-              ctx.fill();
-            });
+            drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_FACE_OVAL, style);
+            drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, style);
+            drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, style);
+            drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYEBROW, style);
+            drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_LEFT_EYEBROW, style);
+            drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_LIPS, style);
           }
         }
       }

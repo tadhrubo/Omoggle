@@ -239,11 +239,12 @@ let blinkThresholdCrossed = false;
 
 export function detectBlink(landmarks: Landmark[]): boolean {
   const currentEAR = calculateEyeAspectRatio(landmarks);
+  console.log("Current EAR:", currentEAR.toFixed(3));
 
   // Blink detection logic:
   // 1. EAR drops below threshold (eye closes)
   // 2. EAR rises back above threshold (eye opens again)
-  if (currentEAR < 0.2 && previousEAR >= 0.2) {
+  if (currentEAR < 0.22 && previousEAR >= 0.22) {
     blinkThresholdCrossed = true;
   }
 
