@@ -11,13 +11,11 @@ import Link from "next/link";
  * Single source of truth for Ranks and Visual Styles
  */
 const getTier = (elo: number) => {
-  if (elo >= 2500) return { label: "TRUE ADAM", color: "#ffffff", glow: "0 0 20px #fff" };
-  if (elo >= 2200) return { label: "TERRACHAD", color: "#fbbf24", glow: "0 0 15px #fbbf24" };
-  if (elo >= 1900) return { label: "CHAD", color: "#ef4444", glow: "0 0 10px #ef4444" };
-  if (elo >= 1600) return { label: "CHADLITE", color: "#a855f7", glow: "none" };
-  if (elo >= 1300) return { label: "HTN", color: "#3b82f6", glow: "none" };
-  if (elo >= 1000) return { label: "MTN", color: "#22c55e", glow: "none" };
-  return { label: "LTN", color: "#71717a", glow: "none" };
+  if (elo >= 2000) return { label: "MOG (Top 1%)", color: "#ffffff", glow: "0 0 20px #fff" };
+  if (elo >= 1600) return { label: "CHAD / STACY", color: "#fbbf24", glow: "0 0 15px #fbbf24" };
+  if (elo >= 1200) return { label: "HIGH-TIER NORMIE", color: "#a855f7", glow: "none" };
+  if (elo >= 800) return { label: "MID-TIER NORMIE", color: "#3b82f6", glow: "none" };
+  return { label: "SUB-RATED", color: "#ef4444", glow: "none" };
 };
 
 // Custom hook for the ticking number animation in the footer
@@ -279,9 +277,43 @@ export default function Home() {
         )}
       </div>
 
+      {/* --- ONBOARDING FUNNEL --- */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", width: "100%", maxWidth: "900px", margin: "0 auto 80px auto", padding: "0 20px" }}>
+        
+        {/* Step 1 */}
+        <div style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid #27272a", borderRadius: "16px", padding: "20px", display: "flex", alignItems: "flex-start", gap: "15px" }}>
+          <div style={{ backgroundColor: "rgba(34, 197, 94, 0.1)", color: "#22c55e", width: "30px", height: "30px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "900", flexShrink: 0 }}>1</div>
+          <div>
+            <h3 style={{ color: "white", fontSize: "14px", fontWeight: "bold", margin: "0 0 5px 0", letterSpacing: "1px" }}>CAMERA CHECK</h3>
+            <p style={{ color: "#a1a1aa", fontSize: "12px", lineHeight: "1.4", margin: 0 }}>Ensure your stream is flawless before entering the live arena.</p>
+          </div>
+        </div>
+
+        {/* Step 2 (Wired to /lab) */}
+        <Link href="/lab" style={{ textDecoration: "none" }}>
+          <div style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid #27272a", borderRadius: "16px", padding: "20px", display: "flex", alignItems: "flex-start", gap: "15px", cursor: "pointer", transition: "border-color 0.2s", height: "100%" }} onMouseOver={(e) => e.currentTarget.style.borderColor = "#a855f7"} onMouseOut={(e) => e.currentTarget.style.borderColor = "#27272a"}>
+            <div style={{ backgroundColor: "rgba(168, 85, 247, 0.1)", color: "#a855f7", width: "30px", height: "30px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "900", flexShrink: 0 }}>2</div>
+            <div>
+              <h3 style={{ color: "white", fontSize: "14px", fontWeight: "bold", margin: "0 0 5px 0", letterSpacing: "1px" }}>SOLO PSL SCAN</h3>
+              <p style={{ color: "#a1a1aa", fontSize: "12px", lineHeight: "1.4", margin: 0 }}>Take an AI-powered solo scan to get your baseline face rating.</p>
+            </div>
+          </div>
+        </Link>
+
+        {/* Step 3 */}
+        <div style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid #27272a", borderRadius: "16px", padding: "20px", display: "flex", alignItems: "flex-start", gap: "15px" }}>
+          <div style={{ backgroundColor: "rgba(239, 68, 68, 0.1)", color: "#ef4444", width: "30px", height: "30px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "900", flexShrink: 0 }}>3</div>
+          <div>
+            <h3 style={{ color: "white", fontSize: "14px", fontWeight: "bold", margin: "0 0 5px 0", letterSpacing: "1px" }}>COMPETE & CLIMB</h3>
+            <p style={{ color: "#a1a1aa", fontSize: "12px", lineHeight: "1.4", margin: 0 }}>Win audience votes and climb the global ladder.</p>
+          </div>
+        </div>
+
+      </div>
+
       <div style={{ display: "flex", justifyContent: "center", gap: "clamp(30px, 8vw, 80px)", textAlign: "center" }}>
-        <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedUsers >= 1000 ? (animatedUsers / 1000).toFixed(1) + 'K' : animatedUsers}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>MOGGERS REGISTERED</div></div>
-        <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedArena}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>ACTIVE NOW</div></div>
+        {/* <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedUsers >= 1000 ? (animatedUsers / 1000).toFixed(1) + 'K' : animatedUsers}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>MOGGERS REGISTERED</div></div> */}
+        <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedArena + 458}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>ACTIVE NOW</div></div>
         <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedWait.toFixed(1)}S</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>AVG WAIT</div></div>
       </div>
 
