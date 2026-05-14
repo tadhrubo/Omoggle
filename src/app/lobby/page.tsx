@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Swords, Trophy, BarChart3, ShieldCheck, Star, MessageCircle, Send } from "lucide-react";
+import { Swords, Trophy, BarChart3, ShieldCheck, Star, MessageCircle, Send, X, Copy, Check } from "lucide-react";
 
 /**
  * PRESTIGE HIERARCHY CONSTANTS
@@ -34,6 +34,35 @@ export default function Lobby() {
   const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+
+  // Private Room State
+  const [isPrivateModalOpen, setIsPrivateModalOpen] = useState(false);
+  const [privateTab, setPrivateTab] = useState<"create" | "join">("create");
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState("");
+  const [codeCopied, setCodeCopied] = useState(false);
+
+  const generateRoomCode = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    setGeneratedCode(code);
+    setCodeCopied(false);
+  };
+
+  const handleCopyCode = () => {
+    if (generatedCode) {
+      navigator.clipboard.writeText(generatedCode);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    }
+  };
+
+  const handleEnterPrivateRoom = (code: string) => {
+    if (code.trim().length >= 4) {
+      router.push(`/arena/private?room=${code.trim().toUpperCase()}`);
+    }
+  };
 
   // Fetch initial data
   useEffect(() => {
@@ -119,16 +148,58 @@ export default function Lobby() {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#050505", color: "white", padding: "40px 20px", fontFamily: "'Inter', sans-serif" }}>
-      <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
+      <style jsx>{`
+        .lobby-container {
+          max-width: 1000px;
+          margin: 0 auto;
+        }
+        .lobby-grid {
+          display: grid;
+          grid-template-columns: 1fr 340px;
+          gap: 40px;
+        }
+        @media (max-width: 900px) {
+          .lobby-grid {
+            grid-template-columns: 1fr;
+            gap: 30px;
+          }
+          .lobby-header {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 20px;
+          }
+          .enter-arena-btn {
+            width: 100%;
+            margin-bottom: 20px !important;
+          }
+          .lobby-tabs {
+            gap: 15px !important;
+          }
+        }
+        @media (max-width: 600px) {
+          .mode-card {
+            padding: 20px !important;
+            gap: 15px !important;
+          }
+          .mode-card-icon {
+            padding: 10px !important;
+          }
+          .mode-card-title {
+            fontSize: 16px !important;
+          }
+        }
+      `}</style>
+
+      <div className="lobby-container">
         
         {/* Header & Tab Switcher */}
-        <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "50px", borderBottom: "1px solid #18181b" }}>
+        <header className="lobby-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "50px", borderBottom: "1px solid #18181b" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
               <span style={{ color: "#ef4444", fontWeight: "900", fontSize: "1.5rem" }}>OMOGGLE</span>
               <span style={{ backgroundColor: "#ef4444", color: "white", fontSize: "10px", fontWeight: "bold", padding: "2px 6px", borderRadius: "4px" }}>BETA</span>
             </div>
-            <div style={{ display: "flex", gap: "30px" }}>
+            <div className="lobby-tabs" style={{ display: "flex", gap: "30px" }}>
               <button 
                 onClick={() => setActiveTab("modes")}
                 style={{ background: "none", border: "none", color: activeTab === "modes" ? "white" : "#3f3f46", fontSize: "14px", fontWeight: "bold", cursor: "pointer", paddingBottom: "15px", borderBottom: activeTab === "modes" ? "2px solid #ef4444" : "none" }}
@@ -139,10 +210,10 @@ export default function Lobby() {
               >GLOBAL RANKS</button>
             </div>
           </div>
-          <button onClick={() => router.push("/arena")} style={{ backgroundColor: "#ef4444", color: "white", fontWeight: "900", padding: "12px 30px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "14px", marginBottom: "15px" }}>ENTER ARENA</button>
+          <button className="enter-arena-btn" onClick={() => router.push("/arena")} style={{ backgroundColor: "#ef4444", color: "white", fontWeight: "900", padding: "12px 30px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "14px", marginBottom: "15px" }}>ENTER ARENA</button>
         </header>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "40px" }}>
+        <div className="lobby-grid">
           
           <main>
             {activeTab === "modes" ? (
@@ -153,6 +224,7 @@ export default function Lobby() {
                   desc="Random opponent. No ELO risk." 
                   color="#ef4444" 
                   active 
+                  className="mode-card"
                   onClick={() => router.push("/arena?mode=casual")}
                 />
                 <ModeCard 
@@ -161,13 +233,17 @@ export default function Lobby() {
                   desc="Competitive ELO. Climb from LTN to TRUE ADAM." 
                   color="#fbbf24" 
                   active 
+                  className="mode-card"
                   onClick={() => router.push("/arena?mode=ranked")}
                 />
                 <ModeCard 
                   icon={<ShieldCheck/>} 
                   title="PRIVATE ROOM" 
-                  desc="Private lobbies for custom battle codes. (Coming Soon)" 
+                  className="mode-card"
+                  desc="Create or join a private battle room with a custom code." 
                   color="#22c55e" 
+                  active
+                  onClick={() => { setIsPrivateModalOpen(true); generateRoomCode(); }}
                 />
               </div>
             ) : (
@@ -277,21 +353,162 @@ export default function Lobby() {
           </aside>
         </div>
       </div>
+
+      {/* ─── PRIVATE ROOM MODAL ─── */}
+      {isPrivateModalOpen && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, backdropFilter: "blur(8px)", padding: "20px" }}>
+          <div style={{ width: "100%", maxWidth: "460px", backgroundColor: "#0a0a0c", border: "1px solid #22c55e30", borderRadius: "24px", padding: "40px 30px", position: "relative", textAlign: "center" }}>
+            
+            {/* Close Button */}
+            <button onClick={() => { setIsPrivateModalOpen(false); setGeneratedCode(null); setJoinCode(""); }} style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", color: "#71717a", cursor: "pointer" }}>
+              <X size={24} />
+            </button>
+
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", marginBottom: "10px" }}>
+              <ShieldCheck size={28} color="#22c55e" />
+              <h2 style={{ fontSize: "1.8rem", fontWeight: "900", color: "white", margin: 0 }}>PRIVATE ROOM</h2>
+            </div>
+            <p style={{ color: "#71717a", fontSize: "13px", marginBottom: "30px" }}>Battle your friends in a private 1v1 arena</p>
+
+            {/* Tab Switcher */}
+            <div style={{ display: "flex", marginBottom: "30px", borderRadius: "10px", overflow: "hidden", border: "1px solid #27272a" }}>
+              <button
+                onClick={() => { setPrivateTab("create"); if (!generatedCode) generateRoomCode(); }}
+                style={{
+                  flex: 1, padding: "12px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "13px", letterSpacing: "1px",
+                  backgroundColor: privateTab === "create" ? "#22c55e" : "#18181b",
+                  color: privateTab === "create" ? "black" : "#71717a",
+                  transition: "all 0.2s"
+                }}
+              >CREATE ROOM</button>
+              <button
+                onClick={() => setPrivateTab("join")}
+                style={{
+                  flex: 1, padding: "12px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "13px", letterSpacing: "1px",
+                  backgroundColor: privateTab === "join" ? "#22c55e" : "#18181b",
+                  color: privateTab === "join" ? "black" : "#71717a",
+                  transition: "all 0.2s"
+                }}
+              >JOIN ROOM</button>
+            </div>
+
+            {/* Create Room Tab */}
+            {privateTab === "create" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                <p style={{ color: "#a1a1aa", fontSize: "13px", margin: 0 }}>Share this code with your opponent</p>
+                
+                {/* Room Code Display */}
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "15px",
+                  backgroundColor: "#18181b", border: "1px solid #22c55e30", borderRadius: "12px", padding: "20px"
+                }}>
+                  <span style={{
+                    fontSize: "2.5rem", fontWeight: "900", letterSpacing: "8px", color: "#22c55e",
+                    fontFamily: "monospace", textShadow: "0 0 15px rgba(34, 197, 94, 0.4)"
+                  }}>
+                    {generatedCode || "------"}
+                  </span>
+                  <button
+                    onClick={handleCopyCode}
+                    style={{
+                      background: "none", border: "1px solid #27272a", borderRadius: "8px", padding: "8px",
+                      cursor: "pointer", color: codeCopied ? "#22c55e" : "#71717a", transition: "all 0.2s"
+                    }}
+                  >
+                    {codeCopied ? <Check size={20} /> : <Copy size={20} />}
+                  </button>
+                </div>
+
+                {codeCopied && (
+                  <span style={{ color: "#22c55e", fontSize: "12px", fontWeight: "bold" }}>✓ Copied to clipboard!</span>
+                )}
+
+                {/* Generate New + Enter */}
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    onClick={generateRoomCode}
+                    style={{
+                      flex: 1, padding: "14px", backgroundColor: "#18181b", color: "#a1a1aa",
+                      border: "1px solid #27272a", borderRadius: "12px", cursor: "pointer",
+                      fontWeight: "bold", fontSize: "13px", transition: "all 0.2s"
+                    }}
+                  >NEW CODE</button>
+                  <button
+                    onClick={() => generatedCode && handleEnterPrivateRoom(generatedCode)}
+                    style={{
+                      flex: 2, padding: "14px", backgroundColor: "#22c55e", color: "black",
+                      border: "none", borderRadius: "12px", cursor: "pointer",
+                      fontWeight: "900", fontSize: "15px", transition: "all 0.2s",
+                      boxShadow: "0 0 20px rgba(34, 197, 94, 0.3)"
+                    }}
+                  >ENTER ROOM</button>
+                </div>
+              </div>
+            )}
+
+            {/* Join Room Tab */}
+            {privateTab === "join" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                <p style={{ color: "#a1a1aa", fontSize: "13px", margin: 0 }}>Enter the room code shared by your opponent</p>
+                
+                <input
+                  type="text"
+                  placeholder="ENTER CODE"
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
+                  maxLength={6}
+                  style={{
+                    width: "100%", padding: "20px", backgroundColor: "#18181b",
+                    border: "1px solid #27272a", borderRadius: "12px", color: "#22c55e",
+                    textAlign: "center", fontSize: "2rem", fontWeight: "900",
+                    letterSpacing: "8px", fontFamily: "monospace", outline: "none",
+                    transition: "border-color 0.2s"
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = "#22c55e"}
+                  onBlur={(e) => e.target.style.borderColor = "#27272a"}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleEnterPrivateRoom(joinCode); }}
+                />
+
+                <button
+                  onClick={() => handleEnterPrivateRoom(joinCode)}
+                  disabled={joinCode.length < 4}
+                  style={{
+                    width: "100%", padding: "16px", backgroundColor: joinCode.length >= 4 ? "#22c55e" : "#27272a",
+                    color: joinCode.length >= 4 ? "black" : "#52525b", border: "none", borderRadius: "12px",
+                    cursor: joinCode.length >= 4 ? "pointer" : "not-allowed",
+                    fontWeight: "900", fontSize: "15px", transition: "all 0.2s",
+                    boxShadow: joinCode.length >= 4 ? "0 0 20px rgba(34, 197, 94, 0.3)" : "none"
+                  }}
+                >JOIN BATTLE</button>
+              </div>
+            )}
+
+            {/* Info Footer */}
+            <div style={{ marginTop: "25px", padding: "12px", backgroundColor: "rgba(34, 197, 94, 0.05)", borderRadius: "8px", border: "1px solid #22c55e15" }}>
+              <p style={{ color: "#52525b", fontSize: "11px", margin: 0, lineHeight: "1.5" }}>
+                Private battles don't affect your ELO rating. Both players need to enter the arena with the same code.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function ModeCard({ icon, title, desc, color, active = false, onClick }: any) {
+function ModeCard({ icon, title, desc, color, active = false, onClick, className }: any) {
   return (
     <button 
       onClick={onClick}
+      className={className}
       style={{ display: "flex", alignItems: "center", gap: "25px", padding: "30px", backgroundColor: active ? "rgba(255,255,255,0.02)" : "transparent", border: `1px solid ${active ? color + "40" : "#18181b"}`, borderRadius: "12px", textAlign: "left", width: "100%", cursor: active ? "pointer" : "default", transition: "all 0.2s" }}
       onMouseOver={(e) => active && (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)")}
       onMouseOut={(e) => active && (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)")}
     >
-      <div style={{ color: color, padding: "15px", backgroundColor: `${color}10`, borderRadius: "10px", border: `1px solid ${color}20` }}>{icon}</div>
+      <div className="mode-card-icon" style={{ color: color, padding: "15px", backgroundColor: `${color}10`, borderRadius: "10px", border: `1px solid ${color}20` }}>{icon}</div>
       <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: "900", fontSize: "18px", color: active ? "white" : "#3f3f46", letterSpacing: "-0.5px" }}>{title}</div>
+        <div className="mode-card-title" style={{ fontWeight: "900", fontSize: "18px", color: active ? "white" : "#3f3f46", letterSpacing: "-0.5px" }}>{title}</div>
         <div style={{ fontSize: "14px", color: "#71717a", marginTop: "4px" }}>{desc}</div>
       </div>
       <div style={{ color: active ? color : "#18181b", fontSize: "24px" }}>→</div>

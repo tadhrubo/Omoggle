@@ -1,6 +1,7 @@
 import "./globals.css"; // CRITICAL: Do not remove this, or your site loses all styling!
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import Link from "next/link";
 
 // ─── VIEWPORT (separated from Metadata per Next.js 14+ best practice) ────────
 export const viewport: Viewport = {
@@ -263,6 +264,32 @@ export default function RootLayout({
       </head>
 
       <body>
+        <Link 
+          href="/" 
+          style={{ 
+            position: "fixed", 
+            top: "24px", 
+            left: "24px", 
+            zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            transition: "transform 0.2s ease"
+          }}
+          onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.05)"}
+          onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
+        >
+          <img 
+            src="/logo.png" 
+            alt="Omoggle Logo" 
+            style={{ 
+              width: "48px", 
+              height: "48px", 
+              borderRadius: "12px",
+              boxShadow: "0 0 20px rgba(239, 68, 68, 0.3)",
+              border: "1px solid rgba(255,255,255,0.1)"
+            }} 
+          />
+        </Link>
         {children}
 
         {/* --- GA4 Analytics Setup --- */}
