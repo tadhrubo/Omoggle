@@ -195,10 +195,6 @@ export default function Lobby() {
         {/* Header & Tab Switcher */}
         <header className="lobby-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "50px", borderBottom: "1px solid #18181b" }}>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
-              <span style={{ color: "#ef4444", fontWeight: "900", fontSize: "1.5rem" }}>OMOGGLE</span>
-              <span style={{ backgroundColor: "#ef4444", color: "white", fontSize: "10px", fontWeight: "bold", padding: "2px 6px", borderRadius: "4px" }}>BETA</span>
-            </div>
             <div className="lobby-tabs" style={{ display: "flex", gap: "30px" }}>
               <button 
                 onClick={() => setActiveTab("modes")}
