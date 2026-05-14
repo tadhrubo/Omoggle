@@ -4,12 +4,13 @@ import { blogs } from "@/data/blogs";
 import { Metadata } from "next";
 
 type Props = {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 };
 
 // Dynamically generate SEO metadata for each article
-export function generateMetadata({ params }: Props): Metadata {
-  const post = blogs.find((b) => b.slug === params.slug);
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const resolvedParams = await params;
+  const post = blogs.find((b) => b.slug === resolvedParams.slug);
   if (!post) return { title: 'Post Not Found' };
   
   return {
@@ -18,8 +19,9 @@ export function generateMetadata({ params }: Props): Metadata {
   };
 }
 
-export default function BlogPost({ params }: Props) {
-  const post = blogs.find((b) => b.slug === params.slug);
+export default async function BlogPost({ params }: Props) {
+  const resolvedParams = await params;
+  const post = blogs.find((b) => b.slug === resolvedParams.slug);
 
   if (!post) {
     notFound();
