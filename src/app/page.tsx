@@ -261,7 +261,7 @@ export default function Home() {
 
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "50px" }}>
         <div style={{ width: "10px", height: "10px", backgroundColor: "#22c55e", borderRadius: "50%", boxShadow: "0 0 10px #22c55e" }}></div>
-        <span style={{ color: "#22c55e", fontSize: "12px", fontWeight: "bold", letterSpacing: "1px" }}>{animatedArena.toLocaleString()} IN ARENA</span>
+        <span style={{ color: "#22c55e", fontSize: "12px", fontWeight: "bold", letterSpacing: "1px" }}>{(animatedArena + 458).toLocaleString()} IN ARENA</span>
       </div>
 
       <div style={{ width: "100%", maxWidth: "400px", marginBottom: "80px", display: "flex", flexDirection: "column", gap: "15px" }}>

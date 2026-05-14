@@ -4,17 +4,13 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Flame, Trophy, Skull, Eye, Swords, Crown, ArrowLeft, Target } from "lucide-react";
 
-const TIERS = [
-  { name: "TRUE ADAM", min: 2500, color: "#ffffff", glow: "0 0 20px #fff", bg: "linear-gradient(135deg, #1a1a2e 0%, #3d2e00 30%, #1a1a2e 60%, #3d2e00 100%)", border: "#ffd700" },
-  { name: "TERRACHAD", min: 2200, color: "#fbbf24", glow: "0 0 15px #fbbf24", bg: "linear-gradient(135deg, #1a1a2e 0%, #2d2000 100%)", border: "#fbbf24" },
-  { name: "CHAD", min: 1900, color: "#ef4444", glow: "0 0 10px #ef4444", bg: "linear-gradient(135deg, #1a0a0a 0%, #2d0a0a 100%)", border: "#ef4444" },
-  { name: "CHADLITE", min: 1600, color: "#a855f7", glow: "none", bg: "linear-gradient(135deg, #0f0520 0%, #1a0a2e 100%)", border: "#a855f7" },
-  { name: "HTN", min: 1300, color: "#3b82f6", glow: "none", bg: "linear-gradient(135deg, #0a0f1a 0%, #0a1a2e 100%)", border: "#3b82f6" },
-  { name: "MTN", min: 1000, color: "#22c55e", glow: "none", bg: "linear-gradient(135deg, #0a1a0f 0%, #0a2e1a 100%)", border: "#22c55e" },
-  { name: "LTN", min: 0, color: "#71717a", glow: "none", bg: "linear-gradient(135deg, #0a0a0a 0%, #18181b 100%)", border: "#27272a" },
-];
-
-const getTier = (elo: number) => TIERS.find(t => elo >= t.min) || TIERS[6];
+const getTier = (elo: number) => {
+  if (elo >= 2000) return { label: "MOG (Top 1%)", color: "#ffffff", glow: "0 0 20px #fff" };
+  if (elo >= 1600) return { label: "CHAD / STACY", color: "#fbbf24", glow: "0 0 15px #fbbf24" };
+  if (elo >= 1200) return { label: "HIGH-TIER NORMIE", color: "#a855f7", glow: "none" };
+  if (elo >= 800) return { label: "MID-TIER NORMIE", color: "#3b82f6", glow: "none" };
+  return { label: "SUB-RATED", color: "#ef4444", glow: "none" };
+};
 
 export default function ProfilePage() {
   const params = useParams();
@@ -134,8 +130,8 @@ export default function ProfilePage() {
 
       {/* ═══ ZONE 1: AURA HEADER ═══ */}
       <div style={{
-        background: tier.bg, backgroundSize: "200% 200%", animation: profile.elo >= 2500 ? "auraPulse 4s ease infinite" : "none",
-        padding: "80px 20px 40px", borderBottom: `2px solid ${tier.border}40`, position: "relative"
+        background: (tier as any).bg || "linear-gradient(135deg, #0a0a0a 0%, #18181b 100%)", backgroundSize: "200% 200%", animation: profile.elo >= 2500 ? "auraPulse 4s ease infinite" : "none",
+        padding: "80px 20px 40px", borderBottom: `2px solid ${(tier as any).border || tier.color}40`, position: "relative"
       }}>
         {/* Back Button */}
         <button onClick={() => router.back()} style={{ position: "absolute", top: "24px", left: "85px", color: "#71717a", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontFamily: "monospace" }}>
@@ -167,7 +163,7 @@ export default function ProfilePage() {
           <div style={{ textAlign: "center" }}>
             <h1 style={{ fontSize: "2rem", fontWeight: "900", margin: "0 0 6px 0", color: "white" }}>{profile.username}</h1>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px" }}>
-              <span style={{ color: tier.color, textShadow: tier.glow, fontWeight: "900", fontSize: "13px", letterSpacing: "2px" }}>{tier.name}</span>
+              <span style={{ color: tier.color, textShadow: tier.glow, fontWeight: "900", fontSize: "13px", letterSpacing: "2px" }}>{tier.label}</span>
               <span style={{ color: "#52525b" }}>•</span>
               <span style={{ color: "white", fontWeight: "900", fontSize: "20px" }}>{profile.elo || 1200}</span>
               <span style={{ color: "#52525b", fontSize: "12px", fontFamily: "monospace" }}>ELO</span>
@@ -283,7 +279,7 @@ export default function ProfilePage() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: "900", fontSize: "15px" }}>{n.nemesis?.username}</div>
-                    <div style={{ fontSize: "11px", color: nTier.color, fontFamily: "monospace" }}>{nTier.name} • {n.nemesis?.elo} ELO</div>
+                    <div style={{ fontSize: "11px", color: nTier.color, fontFamily: "monospace" }}>{nTier.label} • {n.nemesis?.elo} ELO</div>
                   </div>
                   <div style={{ fontSize: "10px", color: "#fbbf24", fontWeight: "bold", letterSpacing: "1px" }}>
                     {n.reason === "streak_breaker" ? "BROKE YOUR STREAK" : "CLOSE RIVAL"}
