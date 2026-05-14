@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Swords, LogOut, User, X, Settings } from "lucide-react";
+import AgeGate from "@/components/AgeGate";
 
 /**
  * PRESTIGE HIERARCHY UTILITY
@@ -205,6 +206,7 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#09090b", color: "white", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif", position: "relative", overflow: "hidden" }}>
+      <AgeGate />
       
       {/* --- DYNAMIC PROFILE PILL (Top Right) --- */}
       <div style={{ position: "absolute", top: "24px", right: "24px", zIndex: 40 }}>
@@ -280,6 +282,47 @@ export default function Home() {
         <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedUsers >= 1000 ? (animatedUsers / 1000).toFixed(1) + 'K' : animatedUsers}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>MOGGERS REGISTERED</div></div>
         <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedArena}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>ACTIVE NOW</div></div>
         <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedWait.toFixed(1)}S</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>AVG WAIT</div></div>
+      </div>
+
+      {/* ─── SEO CONTENT CLUSTER ─── */}
+      <div style={{ width: "100%", maxWidth: "800px", marginTop: "100px", padding: "0 20px", paddingBottom: "100px", textAlign: "left", zIndex: 10, position: "relative" }}>
+        {/* BLOG CARDS */}
+        <div style={{ marginBottom: "60px" }}>
+          <h2 style={{ fontSize: "1.8rem", fontWeight: "900", color: "white", marginBottom: "30px", borderBottom: "1px solid #27272a", paddingBottom: "15px" }}>READ UP BEFORE YOU QUEUE</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
+            <div style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid #27272a", borderRadius: "16px", padding: "24px", cursor: "pointer" }}>
+              <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "2px", marginBottom: "10px" }}>STRATEGY</div>
+              <h3 style={{ color: "white", fontSize: "1.2rem", fontWeight: "bold", margin: "0 0 10px 0" }}>How PSL Rating Actually Works</h3>
+              <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.5", margin: "0 0 20px 0" }}>Symmetry, harmony, jawline, canthal tilt — understand the metrics that determine who wins the battle.</p>
+              <span style={{ color: "#ef4444", fontSize: "12px", fontWeight: "bold" }}>READ ARTICLE →</span>
+            </div>
+            <div style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid #27272a", borderRadius: "16px", padding: "24px", cursor: "pointer" }}>
+              <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "2px", marginBottom: "10px" }}>CULTURE</div>
+              <h3 style={{ color: "white", fontSize: "1.2rem", fontWeight: "bold", margin: "0 0 10px 0" }}>Omegle Alternatives in 2026</h3>
+              <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.5", margin: "0 0 20px 0" }}>From basic chatroulettes to ranked arenas. A quick map of the random-video landscape after Omegle shut down.</p>
+              <span style={{ color: "#ef4444", fontSize: "12px", fontWeight: "bold" }}>READ ARTICLE →</span>
+            </div>
+          </div>
+        </div>
+        {/* FAQ ACCORDION */}
+        <div>
+          <h2 style={{ fontSize: "1.8rem", fontWeight: "900", color: "white", marginBottom: "30px", borderBottom: "1px solid #27272a", paddingBottom: "15px" }}>FREQUENTLY ASKED QUESTIONS</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+            {[
+              { q: "What is Omoggle?", a: "Omoggle is a competitive 1v1 video chat arena. Unlike traditional random chat sites, we feature a live Elo ranking system where the community votes on who wins the face-off." },
+              { q: "How is Omoggle different from Omegle?", a: "Omegle was entirely random and unmoderated. Omoggle introduces stakes, ranked matchmaking, user profiles, and a global leaderboard to turn video chat into a competitive game." },
+              { q: "Is it safe? Do you record video?", a: "Your safety and privacy are paramount. We use Peer-to-Peer (WebRTC) technology, meaning video streams connect directly between users. We do not record or store your camera feed." },
+              { q: "Do I need an account to play?", a: "No, you can enter the Casual Arena as a Guest. However, if you want to climb the ranks, track your Elo, and appear on the Leaderboard, you need to sign in with Google." }
+            ].map((faq, i) => (
+              <details key={i} style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid #27272a", borderRadius: "12px", padding: "20px", cursor: "pointer" }}>
+                <summary style={{ color: "white", fontSize: "16px", fontWeight: "bold", outline: "none", listStyle: "none", display: "flex", justifyContent: "space-between" }}>
+                  {faq.q} <span style={{ color: "#71717a" }}>+</span>
+                </summary>
+                <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.6", margin: "15px 0 0 0" }}>{faq.a}</p>
+              </details>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* --- SETTINGS MODAL --- */}
