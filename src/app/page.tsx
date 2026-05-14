@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Swords, LogOut, User, X, Settings } from "lucide-react";
 import AgeGate from "@/components/AgeGate";
+import Link from "next/link";
 
 /**
  * PRESTIGE HIERARCHY UTILITY
@@ -290,18 +291,25 @@ export default function Home() {
         <div style={{ marginBottom: "60px" }}>
           <h2 style={{ fontSize: "1.8rem", fontWeight: "900", color: "white", marginBottom: "30px", borderBottom: "1px solid #27272a", paddingBottom: "15px" }}>READ UP BEFORE YOU QUEUE</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
-            <div style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid #27272a", borderRadius: "16px", padding: "24px", cursor: "pointer" }}>
-              <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "2px", marginBottom: "10px" }}>STRATEGY</div>
-              <h3 style={{ color: "white", fontSize: "1.2rem", fontWeight: "bold", margin: "0 0 10px 0" }}>How PSL Rating Actually Works</h3>
-              <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.5", margin: "0 0 20px 0" }}>Symmetry, harmony, jawline, canthal tilt — understand the metrics that determine who wins the battle.</p>
-              <span style={{ color: "#ef4444", fontSize: "12px", fontWeight: "bold" }}>READ ARTICLE →</span>
-            </div>
-            <div style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid #27272a", borderRadius: "16px", padding: "24px", cursor: "pointer" }}>
-              <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "2px", marginBottom: "10px" }}>CULTURE</div>
-              <h3 style={{ color: "white", fontSize: "1.2rem", fontWeight: "bold", margin: "0 0 10px 0" }}>Omegle Alternatives in 2026</h3>
-              <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.5", margin: "0 0 20px 0" }}>From basic chatroulettes to ranked arenas. A quick map of the random-video landscape after Omegle shut down.</p>
-              <span style={{ color: "#ef4444", fontSize: "12px", fontWeight: "bold" }}>READ ARTICLE →</span>
-            </div>
+            
+            <Link href="/blog/how-psl-rating-works" style={{ textDecoration: "none" }}>
+              <div style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid #27272a", borderRadius: "16px", padding: "24px", transition: "border-color 0.2s", cursor: "pointer", height: "100%" }} onMouseOver={(e) => e.currentTarget.style.borderColor = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.borderColor = "#27272a"}>
+                <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "2px", marginBottom: "10px" }}>STRATEGY</div>
+                <h3 style={{ color: "white", fontSize: "1.2rem", fontWeight: "bold", margin: "0 0 10px 0" }}>How PSL Rating Actually Works</h3>
+                <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.5", margin: "0 0 20px 0" }}>Symmetry, harmony, jawline, canthal tilt — understand the metrics that determine who wins the battle.</p>
+                <span style={{ color: "#ef4444", fontSize: "12px", fontWeight: "bold" }}>READ ARTICLE →</span>
+              </div>
+            </Link>
+
+            <Link href="/blog/omegle-alternatives-2026" style={{ textDecoration: "none" }}>
+              <div style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid #27272a", borderRadius: "16px", padding: "24px", transition: "border-color 0.2s", cursor: "pointer", height: "100%" }} onMouseOver={(e) => e.currentTarget.style.borderColor = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.borderColor = "#27272a"}>
+                <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "2px", marginBottom: "10px" }}>CULTURE</div>
+                <h3 style={{ color: "white", fontSize: "1.2rem", fontWeight: "bold", margin: "0 0 10px 0" }}>Omegle Alternatives in 2026</h3>
+                <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.5", margin: "0 0 20px 0" }}>From basic chatroulettes to ranked arenas. A quick map of the random-video landscape after Omegle shut down.</p>
+                <span style={{ color: "#ef4444", fontSize: "12px", fontWeight: "bold" }}>READ ARTICLE →</span>
+              </div>
+            </Link>
+
           </div>
         </div>
         {/* FAQ ACCORDION */}
