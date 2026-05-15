@@ -133,7 +133,7 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
         streamRef.current = stream; // Save to ref for cleanup
 
         const uniqueId = "user_" + Math.random().toString(36).substr(2, 9);
-        const peer = new Peer(uniqueId, { host: "localhost", port: 9000, path: "/", secure: false });
+        const peer = new Peer(uniqueId);
         peerRef.current = peer;
 
         peer.on("open", () => {

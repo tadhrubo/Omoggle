@@ -54,7 +54,7 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect }: Pri
 
         // 2. Create PeerJS peer
         const uniqueId = "priv_" + Math.random().toString(36).substr(2, 9);
-        const peer = new Peer(uniqueId, { host: "localhost", port: 9000, path: "/", secure: false });
+        const peer = new Peer(uniqueId);
         peerRef.current = peer;
 
         peer.on("open", async () => {
