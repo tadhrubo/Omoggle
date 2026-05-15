@@ -64,8 +64,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const requestRef = useRef<number | undefined>(undefined);
   const lastTelemetryTime = useRef(0);
 
-  const [battlePhase, setBattlePhase] = useState<"waiting" | "connected" | "countdown" | "result">("waiting");
-  const [countdown, setCountdown] = useState(5);
+  const [battleState, setBattleState] = useState<'WAITING' | 'PLAYING' | 'SCORING' | 'RESULT'>('WAITING');
+  const [timeLeft, setTimeLeft] = useState(10);
   const [myScore, setMyScore] = useState<number | null>(null);
   const [liveMyScore, setLiveMyScore] = useState<number | null>(null);
 
@@ -76,10 +76,10 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
     roomCode,
     playerElo: localProfile.elo,
     onDisconnect: () => {
-      setBattlePhase("waiting");
+      setBattleState('WAITING');
       setMyScore(null);
       setLiveMyScore(null);
-      setCountdown(5);
+      setTimeLeft(10);
     }
   });
 
@@ -94,13 +94,12 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   }, [remoteStream]);
 
   useEffect(() => {
-    if (isConnected && battlePhase === "waiting") {
+    if (isConnected && battleState === "WAITING") {
       sendTelemetry("PROFILE_SYNC", { profile: localProfile });
-      setBattlePhase("connected");
-      setCountdown(5);
-      setTimeout(() => setBattlePhase("countdown"), 1000);
+      setBattleState("PLAYING");
+      setTimeLeft(10);
     }
-  }, [isConnected, battlePhase, sendTelemetry, localProfile]);
+  }, [isConnected, battleState, sendTelemetry, localProfile]);
 
   const handleLocalVideoReady = () => {
     const loop = () => {
@@ -150,23 +149,18 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
               ctx.fillStyle = "#39FF14";
               pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
 
-              if (battlePhase === "countdown") {
+              if (battleState === "PLAYING") {
                 if (timeMs - lastTelemetryTime.current > 150) {
                   const score = calculateMogScore(result.faceLandmarks[0] as any).score;
                   setLiveMyScore(score); sendTelemetry("LIVE_SCORE", { score });
                   lastTelemetryTime.current = timeMs;
                 }
+              }
 
-                // Match end logic
-                if (countdown === 0 && myScore === null) {
-                  const final = calculateMogScore(result.faceLandmarks[0] as any).score;
-                  setMyScore(final);
-                  sendTelemetry("FINAL_SCORE", { score: final });
-                  setBattlePhase("result");
-
-                  const isWinner = final > (opponentScore || 0);
-                  playResultSound(isWinner);
-                }
+              if (battleState === "SCORING" && myScore === null) {
+                const final = calculateMogScore(result.faceLandmarks[0] as any).score;
+                setMyScore(final);
+                sendTelemetry("FINAL_SCORE", { score: final });
               }
             }
           }
@@ -178,25 +172,44 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   };
 
   useEffect(() => {
-    if (battlePhase === "countdown" && countdown > 0) {
+    if (battleState === "PLAYING" && timeLeft > 0) {
       playTickSound();
-      const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+      const timer = setTimeout(() => setTimeLeft(c => c - 1), 1000);
       return () => clearTimeout(timer);
+    } else if (battleState === "PLAYING" && timeLeft === 0) {
+      setBattleState("SCORING");
     }
-  }, [battlePhase, countdown]);
+  }, [battleState, timeLeft]);
+
+  useEffect(() => {
+    if (battleState === "SCORING" && myScore !== null && opponentScore !== null) {
+      setBattleState("RESULT");
+      const isWinner = myScore > opponentScore;
+      playResultSound(isWinner);
+    }
+  }, [battleState, myScore, opponentScore]);
 
   const verdict = myScore !== null && opponentScore !== null ? getMatchVerdict(myScore, opponentScore) : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100vw", backgroundColor: "#09090b", overflow: "hidden", position: "relative" }}>
 
+      {/* 10-Second Timer Display */}
+      {battleState === "PLAYING" && (
+        <div style={{ position: "absolute", top: "80px", left: "50%", transform: "translateX(-50%)", zIndex: 50, fontSize: "4rem", fontWeight: "900", color: "#ef4444", textShadow: "0 0 20px #ef4444" }}>
+          {timeLeft}
+        </div>
+      )}
+
       {/* Result Overlay */}
-      {battlePhase === "result" && verdict && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 100, backgroundColor: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-          <h1 style={{ fontSize: "5.5rem", fontWeight: 900, color: verdict.color, textShadow: `0 0 30px ${verdict.color}80`, margin: 0 }}>{verdict.title}</h1>
+      {battleState === "RESULT" && verdict && (
+        <div style={{ position: "absolute", inset: 0, zIndex: 100, backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <h1 style={{ fontSize: "5.5rem", fontWeight: 900, color: verdict.color, textShadow: `0 0 30px ${verdict.color}80`, margin: 0, textAlign: "center", lineHeight: 1.1 }}>
+            {myScore !== null && opponentScore !== null && myScore > opponentScore ? "YOU MOGGED" : (myScore !== null && opponentScore !== null && myScore < opponentScore ? "MOGGED" : "STALEMATE")}
+          </h1>
           <div style={{ color: "white", fontWeight: "bold", letterSpacing: "5px", marginBottom: "30px", opacity: 0.9 }}>{verdict.sub}</div>
 
-          <div style={{ display: "flex", gap: "4rem", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "4rem", alignItems: "center", marginBottom: "40px" }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ color: "#a1a1aa", fontSize: "12px", marginBottom: "5px", fontFamily: "monospace" }}>OPPONENT</div>
               <div style={{ fontSize: "3.5rem", fontWeight: 900, color: "white" }}>{opponentScore?.toFixed(1)}</div>
@@ -206,6 +219,17 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
               <div style={{ color: "#a1a1aa", fontSize: "12px", marginBottom: "5px", fontFamily: "monospace" }}>YOU</div>
               <div style={{ fontSize: "3.5rem", fontWeight: 900, color: verdict.color }}>{myScore?.toFixed(1)}</div>
             </div>
+          </div>
+          
+          <div style={{ display: "flex", gap: "20px" }}>
+            <button onClick={() => {
+                setBattleState("WAITING");
+                setMyScore(null);
+                setLiveMyScore(null);
+                setTimeLeft(10);
+                if (isConnected) setBattleState("PLAYING");
+            }} style={{ padding: "15px 30px", backgroundColor: "#22c55e", color: "white", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" }}>NEXT BATTLE</button>
+            <button onClick={() => router.push("/lobby")} style={{ padding: "15px 30px", backgroundColor: "transparent", color: "white", border: "1px solid #27272a", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" }}>LEAVE</button>
           </div>
         </div>
       )}
@@ -251,7 +275,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
               <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{remoteProfile.name}</div>
             </div>
           )}
-          {liveOpponentScore && battlePhase === "countdown" && (
+          {liveOpponentScore && (battleState === "PLAYING" || battleState === "SCORING") && (
             <div style={{ position: "absolute", bottom: 16, right: 16, zIndex: 20, color: "white", fontWeight: "900", fontSize: "4rem", opacity: 0.8 }}>{liveOpponentScore.toFixed(1)}</div>
           )}
         </div>
@@ -263,11 +287,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
             <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{localProfile.name}</div>
           </div>
-          {liveMyScore && battlePhase === "countdown" && (
+          {liveMyScore && (battleState === "PLAYING" || battleState === "SCORING") && (
             <div style={{ position: "absolute", bottom: 16, right: 16, zIndex: 20, color: "white", fontWeight: "900", fontSize: "4rem", opacity: 0.8 }}>{liveMyScore.toFixed(1)}</div>
-          )}
-          {battlePhase === "countdown" && countdown > 0 && (
-            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 30, color: "white", fontSize: "9rem", fontWeight: 900 }}>{countdown}</div>
           )}
         </div>
       </div>
@@ -278,7 +299,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
           LEAVE ROOM
         </button>
         <button onClick={() => window.location.reload()} style={{ backgroundColor: "#22c55e", color: "white", fontWeight: "900", fontSize: "18px", padding: "12px 48px", borderRadius: "99px", border: "none", cursor: "pointer" }}>
-          {battlePhase === "result" ? "REMATCH" : "SKIP"}
+          {battleState === "RESULT" ? "REMATCH" : "SKIP"}
         </button>
       </div>
 
