@@ -133,7 +133,18 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
         streamRef.current = stream; // Save to ref for cleanup
 
         const uniqueId = "user_" + Math.random().toString(36).substr(2, 9);
-        const peer = new Peer(uniqueId);
+        const peer = new Peer(uniqueId, {
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' },
+              { urls: 'stun:stun2.l.google.com:19302' },
+              { urls: 'stun:stun3.l.google.com:19302' },
+              { urls: 'stun:stun4.l.google.com:19302' },
+              { urls: 'stun:global.stun.twilio.com:3478' }
+            ]
+          }
+        });
         peerRef.current = peer;
 
         peer.on("open", () => {
