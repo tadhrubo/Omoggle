@@ -354,26 +354,48 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
               {error && <span style={{ color: "#ef4444", fontSize: "12px" }}>{error}</span>}
             </div>
           )}
-          <video ref={remoteVideoRef} autoPlay playsInline className="video-element" style={{ transform: "scaleX(-1)" }} />
+          <video ref={remoteVideoRef} autoPlay playsInline className="video-element" style={{ transform: "scaleX(-1)", position: "relative", zIndex: 10 }} />
           {remoteProfile && (
             <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
               <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{remoteProfile.name}</div>
             </div>
           )}
-          {liveOpponentScore && (phase === "BATTLE" || phase === "SCORING") && (
-            <div style={{ position: "absolute", bottom: 16, right: 16, zIndex: 20, color: "white", fontWeight: "900", fontSize: "4rem", opacity: 0.8 }}>{liveOpponentScore.toFixed(1)}</div>
+          {phase === 'BATTLE' && liveOpponentScore !== null && (
+            <div style={{
+              position: 'absolute',
+              bottom: '20px',
+              right: '20px',
+              zIndex: 40,
+              fontSize: '4rem',
+              fontWeight: '900',
+              color: '#ffffff',
+              textShadow: '0 0 20px rgba(0,0,0,0.8), 2px 2px 0 #000'
+            }}>
+              {liveOpponentScore.toFixed(1)}
+            </div>
           )}
         </div>
 
         {/* Bottom: Local View */}
         <div className="video-box" style={{ borderTop: "2px solid #27272a" }}>
-          <video ref={localVideoRef} autoPlay playsInline muted onLoadedData={handleLocalVideoReady} className="video-element" style={{ transform: "scaleX(-1)" }} />
-          <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 2, pointerEvents: "none", transform: "scaleX(-1)" }} />
+          <video ref={localVideoRef} autoPlay playsInline muted onLoadedData={handleLocalVideoReady} className="video-element" style={{ transform: "scaleX(-1)", position: "relative", zIndex: 10 }} />
+          <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 15, pointerEvents: "none", transform: "scaleX(-1)" }} />
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
             <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{localProfile.name}</div>
           </div>
-          {liveMyScore && (phase === "BATTLE" || phase === "SCORING") && (
-            <div style={{ position: "absolute", bottom: 16, right: 16, zIndex: 20, color: "white", fontWeight: "900", fontSize: "4rem", opacity: 0.8 }}>{liveMyScore.toFixed(1)}</div>
+          {phase === 'BATTLE' && liveMyScore !== null && (
+            <div style={{
+              position: 'absolute',
+              bottom: '20px',
+              right: '20px',
+              zIndex: 40,
+              fontSize: '4rem',
+              fontWeight: '900',
+              color: '#ffffff',
+              textShadow: '0 0 20px rgba(0,0,0,0.8), 2px 2px 0 #000'
+            }}>
+              {liveMyScore.toFixed(1)}
+            </div>
           )}
         </div>
       </div>
