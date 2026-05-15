@@ -291,9 +291,9 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         <div style={{ width: "60px" }}></div>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', width: '100%', height: '100vh', overflow: 'hidden' }}>
+      <div className="arena-layout">
         {/* Top: Opponent View */}
-        <div style={{ flex: '1 1 500px', height: '100%', minHeight: '50vh', position: 'relative', backgroundColor: "#000" }}>
+        <div className="video-box">
           {isSearching && (
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#22c55e", zIndex: 10, gap: "15px" }}>
               <div style={{ width: "60px", height: "60px", border: "3px solid #18181b", borderTopColor: "#22c55e", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
@@ -306,7 +306,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
               {error && <span style={{ color: "#ef4444", fontSize: "12px" }}>{error}</span>}
             </div>
           )}
-          <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', transform: "scaleX(-1)" }} />
+          <video ref={remoteVideoRef} autoPlay playsInline className="video-element" style={{ transform: "scaleX(-1)" }} />
           {remoteProfile && (
             <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
               <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{remoteProfile.name}</div>
@@ -318,8 +318,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         </div>
 
         {/* Bottom: Local View */}
-        <div style={{ flex: '1 1 500px', height: '100%', minHeight: '50vh', position: 'relative', backgroundColor: "#000", borderTop: "2px solid #27272a" }}>
-          <video ref={localVideoRef} autoPlay playsInline muted onLoadedData={handleLocalVideoReady} style={{ width: '100%', height: '100%', objectFit: 'cover', transform: "scaleX(-1)" }} />
+        <div className="video-box" style={{ borderTop: "2px solid #27272a" }}>
+          <video ref={localVideoRef} autoPlay playsInline muted onLoadedData={handleLocalVideoReady} className="video-element" style={{ transform: "scaleX(-1)" }} />
           <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 2, pointerEvents: "none", transform: "scaleX(-1)" }} />
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
             <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{localProfile.name}</div>
@@ -337,6 +337,36 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         </button>
       </div>
 
+      <style>{`
+        .arena-layout {
+          display: flex;
+          flex-direction: column;
+          width: 100vw;
+          height: 100vh;
+          overflow: hidden;
+          background-color: #000;
+        }
+        .video-box {
+          flex: 1;
+          position: relative;
+          width: 100%;
+          height: 50vh;
+        }
+        @media (min-width: 768px) {
+          .arena-layout {
+            flex-direction: row;
+          }
+          .video-box {
+            width: 50vw;
+            height: 100vh;
+          }
+        }
+        .video-element {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+      `}</style>
       <style jsx global>{` @keyframes spin { 100% { transform: rotate(360deg); } } `}</style>
     </div>
   );
