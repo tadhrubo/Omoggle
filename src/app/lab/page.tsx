@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FlaskConical, Scan, Loader2, RefreshCw } from "lucide-react";
 import { useFaceScanner } from "@/hooks/useFaceScanner";
-import { calculateMogScore, type MogScoreResult } from "@/utils/faceMath";
+import { calculateDetailedMogScore, type MogScoreResult } from "@/utils/faceMath";
 import { FaceLandmarker, DrawingUtils } from "@mediapipe/tasks-vision";
 import CameraCheckModal from "@/app/components/CameraCheckModal";
 
@@ -167,8 +167,8 @@ export default function Lab() {
     // Calculate score
     if (videoRef.current) {
       const result = detect(videoRef.current);
-      if (result && result.faceLandmarks.length > 0) {
-        const mogResult = calculateMogScore(result);
+      if (result && result.faceLandmarks && result.faceLandmarks.length > 0) {
+        const mogResult = calculateDetailedMogScore(result.faceLandmarks[0] as any);
         setScoreResult(mogResult);
       } else {
         setWarning("Lost face tracking during scan. Try again.");

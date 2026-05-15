@@ -156,64 +156,68 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
               pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
 
               if (battlePhase === "countdown") {
-                if (timeMs - lastTelemetryTime.current > 150) {
-                  const score = calculateMogScore(result.faceLandmarks[0] as any).score;
-                  setLiveMyScore(score); sendTelemetry("LIVE_SCORE", { score });
-                  lastTelemetryTime.current = timeMs;
-                }
-                
-                // 3. MATCH END LOGIC
-                if (countdown === 0 && myScore === null) {
-                  const final = calculateMogScore(result.faceLandmarks[0] as any).score;
-                  setMyScore(final);
-                  sendTelemetry("FINAL_SCORE", { score: final });
-                  setBattlePhase("result");
+                if (result.faceLandmarks && result.faceLandmarks.length > 0) {
+                  const rawScore = calculateMogScore(result.faceLandmarks[0] as any);
+                  const currentScore = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0;
 
-                  // Play victory/defeat sound
-                  const isWinner = final > (opponentScore || 0);
-                  playResultSound(isWinner);
-                  const oppElo = remoteProfile?.elo || 1200;
-                  const { newElo, eloChange } = calculateEloUpdate(localProfile.elo, oppElo, isWinner);
+                  if (timeMs - lastTelemetryTime.current > 150) {
+                    setLiveMyScore(currentScore); 
+                    sendTelemetry("LIVE_SCORE", { score: currentScore });
+                    lastTelemetryTime.current = timeMs;
+                  }
                   
-                  setEloResult({ newElo, change: eloChange });
+                  // 3. MATCH END LOGIC
+                  if (countdown === 0 && myScore === null) {
+                    setMyScore(currentScore);
+                    sendTelemetry("FINAL_SCORE", { score: currentScore });
+                    setBattlePhase("result");
 
-                  // Persist: Stats + Match Record (Ranked + Authenticated only)
-                  if (mode === "ranked" && localProfile.id) {
-                    // Atomic stats update via RPC
-                    supabase.rpc('update_post_match_stats', {
-                      p_user_id: localProfile.id,
-                      p_new_elo: newElo,
-                      p_is_winner: isWinner,
-                      p_mode: mode
-                    }).then(() => console.log("Stats updated."));
+                    // Play victory/defeat sound
+                    const isWinner = currentScore > (opponentScore || 0);
+                    playResultSound(isWinner);
+                    const oppElo = remoteProfile?.elo || 1200;
+                    const { newElo, eloChange } = calculateEloUpdate(localProfile.elo, oppElo, isWinner);
+                    
+                    setEloResult({ newElo, change: eloChange });
 
-                    // Save match to history
-                    supabase.from('matches').insert([{
-                      winner_id: isWinner ? localProfile.id : (remoteProfile?.id || null),
-                      loser_id: isWinner ? (remoteProfile?.id || null) : localProfile.id,
-                      winner_score: isWinner ? final : (opponentScore || 0),
-                      loser_score: isWinner ? (opponentScore || 0) : final,
-                      elo_change: Math.abs(eloChange),
-                      mode: mode
-                    }]).then(() => console.log("Match record saved."));
-
-                    // Nemesis detection: if we broke opponent's 5+ streak
-                    if (isWinner && remoteProfile?.id && (remoteProfile?.current_streak || 0) >= 5) {
-                      supabase.from('nemeses').upsert([{
-                        user_id: remoteProfile.id,
-                        nemesis_id: localProfile.id,
-                        reason: 'streak_breaker'
-                      }], { onConflict: 'user_id,nemesis_id' }).then(() => console.log("Nemesis tagged."));
-                    }
-
-                    // Also update opponent stats if they're authenticated
-                    if (remoteProfile?.id) {
+                    // Persist: Stats + Match Record (Ranked + Authenticated only)
+                    if (mode === "ranked" && localProfile.id) {
+                      // Atomic stats update via RPC
                       supabase.rpc('update_post_match_stats', {
-                        p_user_id: remoteProfile.id,
-                        p_new_elo: calculateEloUpdate(oppElo, localProfile.elo, !isWinner).newElo,
-                        p_is_winner: !isWinner,
+                        p_user_id: localProfile.id,
+                        p_new_elo: newElo,
+                        p_is_winner: isWinner,
                         p_mode: mode
-                      }).then();
+                      }).then(() => console.log("Stats updated."));
+
+                      // Save match to history
+                      supabase.from('matches').insert([{
+                        winner_id: isWinner ? localProfile.id : (remoteProfile?.id || null),
+                        loser_id: isWinner ? (remoteProfile?.id || null) : localProfile.id,
+                        winner_score: isWinner ? currentScore : (opponentScore || 0),
+                        loser_score: isWinner ? (opponentScore || 0) : currentScore,
+                        elo_change: Math.abs(eloChange),
+                        mode: mode
+                      }]).then(() => console.log("Match record saved."));
+
+                      // Nemesis detection: if we broke opponent's 5+ streak
+                      if (isWinner && remoteProfile?.id && (remoteProfile?.current_streak || 0) >= 5) {
+                        supabase.from('nemeses').upsert([{
+                          user_id: remoteProfile.id,
+                          nemesis_id: localProfile.id,
+                          reason: 'streak_breaker'
+                        }], { onConflict: 'user_id,nemesis_id' }).then(() => console.log("Nemesis tagged."));
+                      }
+
+                      // Also update opponent stats if they're authenticated
+                      if (remoteProfile?.id) {
+                        supabase.rpc('update_post_match_stats', {
+                          p_user_id: remoteProfile.id,
+                          p_new_elo: calculateEloUpdate(oppElo, localProfile.elo, !isWinner).newElo,
+                          p_is_winner: !isWinner,
+                          p_mode: mode
+                        }).then();
+                      }
                     }
                   }
                 }

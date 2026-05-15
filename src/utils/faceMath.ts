@@ -149,53 +149,49 @@ export interface MogScoreResult {
   };
 }
 
-export function calculateMogScore(result: FaceLandmarkerResult): MogScoreResult {
-  if (!result.faceLandmarks || result.faceLandmarks.length === 0) {
-    return {
-      score: 1.0,
-      metrics: {
-        canthalTilt: "0.00°",
-        symmetry: "0.0%",
-        jawline: "0.00",
-      },
-    };
-  }
-
-  const landmarks = result.faceLandmarks[0] as unknown as Landmark[];
+/**
+ * Calculates a raw Mog Score for high-performance loops.
+ * @returns {number} The 1-decimal mog score.
+ */
+export function calculateMogScore(landmarks: Landmark[]): number {
+  if (!landmarks || landmarks.length === 0) return 0;
 
   // Calculate base score from structure (3.0 to 8.0)
   const structureScore = calculateStructureScore(landmarks);
   const baseScore = Math.min(8, Math.max(3, 3 + structureScore));
 
-  // Calculate metrics
-  const canthalTilt = calculateCanthalTilt(landmarks);
-  const symmetry = calculateSymmetry(landmarks);
-  const jawline = calculateJawlineRatio(landmarks);
-
-  // Reduced viral variance (max 0.5) - score is heavily weighted by actual facial math
+  // Reduced viral variance (max 0.5)
   const viralVariance = Math.random() * 0.5;
 
   // Final score capped at 9.9
   const finalScore = Math.min(9.9, baseScore + viralVariance);
 
   // --- THE EGO BUFF CURVE ---
-  // Raw scores usually land between 3.5 and 6.0 due to webcam distortion.
-  // We curve this to a more satisfying 6.0 - 9.5 range.
   let buffedScore = finalScore;
-
   if (finalScore < 4.0) {
-    buffedScore = finalScore * 1.5; // Massive buff for bad angles
+    buffedScore = finalScore * 1.5;
   } else if (finalScore >= 4.0 && finalScore < 6.0) {
-    buffedScore = finalScore * 1.35; // Standard buff for average faces
+    buffedScore = finalScore * 1.35;
   } else if (finalScore >= 6.0) {
-    buffedScore = finalScore * 1.2; // Slight buff for good faces
+    buffedScore = finalScore * 1.2;
   }
 
-  // Cap the maximum possible score to 9.9 to keep it somewhat realistic
   buffedScore = Math.min(buffedScore, 9.9);
+  return parseFloat(buffedScore.toFixed(1));
+}
+
+/**
+ * Calculates a detailed Mog Score with metrics for UI display.
+ */
+export function calculateDetailedMogScore(landmarks: Landmark[]): MogScoreResult {
+  const score = calculateMogScore(landmarks);
+  
+  const canthalTilt = calculateCanthalTilt(landmarks);
+  const symmetry = calculateSymmetry(landmarks);
+  const jawline = calculateJawlineRatio(landmarks);
 
   return {
-    score: parseFloat(buffedScore.toFixed(1)), // Ensure it returns a 1-decimal float
+    score,
     metrics: {
       canthalTilt: canthalTilt.toFixed(2) + "°",
       symmetry: (symmetry * 100).toFixed(1) + "%",

@@ -187,15 +187,26 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
               pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
 
               if (phaseRef.current === 'BATTLE') {
-                const currentScore = calculateMogScore(result.faceLandmarks[0] as any).score;
-                if (currentScore > 1.0) {
-                  scoreHistoryRef.current.push(currentScore);
-                  console.log("Captured frame score:", currentScore);
-                }
-                if (timeMs - lastTelemetryTime.current > 150) {
-                  setLiveMyScore(currentScore); 
-                  sendTelemetry("LIVE_SCORE", { score: currentScore });
-                  lastTelemetryTime.current = timeMs;
+                // 1. Guard against empty frames (when no face is detected)
+                if (result.faceLandmarks && result.faceLandmarks.length > 0) {
+                  
+                  // 2. Remove the `.score` accessor. The function returns a raw number.
+                  const rawScore = calculateMogScore(result.faceLandmarks[0] as any);
+                  
+                  // 3. Fallback just in case the math returns NaN
+                  const currentScore = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0;
+
+                  if (currentScore > 1.0) {
+                    scoreHistoryRef.current.push(currentScore);
+                    console.log("Captured frame score:", currentScore);
+                  }
+                  
+                  // Live telemetry throttling (150ms)
+                  if (timeMs - lastTelemetryTime.current > 150) {
+                    setLiveMyScore(currentScore); 
+                    sendTelemetry("LIVE_SCORE", { score: currentScore });
+                    lastTelemetryTime.current = timeMs;
+                  }
                 }
               }
             }
