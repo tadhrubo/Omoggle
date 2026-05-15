@@ -178,8 +178,24 @@ export function calculateMogScore(result: FaceLandmarkerResult): MogScoreResult 
   // Final score capped at 9.9
   const finalScore = Math.min(9.9, baseScore + viralVariance);
 
+  // --- THE EGO BUFF CURVE ---
+  // Raw scores usually land between 3.5 and 6.0 due to webcam distortion.
+  // We curve this to a more satisfying 6.0 - 9.5 range.
+  let buffedScore = finalScore;
+
+  if (finalScore < 4.0) {
+    buffedScore = finalScore * 1.5; // Massive buff for bad angles
+  } else if (finalScore >= 4.0 && finalScore < 6.0) {
+    buffedScore = finalScore * 1.35; // Standard buff for average faces
+  } else if (finalScore >= 6.0) {
+    buffedScore = finalScore * 1.2; // Slight buff for good faces
+  }
+
+  // Cap the maximum possible score to 9.9 to keep it somewhat realistic
+  buffedScore = Math.min(buffedScore, 9.9);
+
   return {
-    score: Math.round(finalScore * 10) / 10, // Round to 1 decimal
+    score: parseFloat(buffedScore.toFixed(1)), // Ensure it returns a 1-decimal float
     metrics: {
       canthalTilt: canthalTilt.toFixed(2) + "°",
       symmetry: (symmetry * 100).toFixed(1) + "%",
