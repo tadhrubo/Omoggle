@@ -89,29 +89,13 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect }: Pri
             .limit(1);
 
           if (existing && existing.length > 0) {
-            // Opponent is already there — initiate the call
+            // We are player 2. Dial player 1.
+            console.log("Opponent found. Initiating call...");
             const opponentPeerId = existing[0].peer_id;
             connectToPeer(peer, stream, opponentPeerId);
           } else {
-            // 5. Wait for opponent via Realtime subscription
-            const channel = supabase
-              .channel(`private_room_${roomCode.toUpperCase()}`)
-              .on(
-                "postgres_changes",
-                {
-                  event: "INSERT",
-                  schema: "public",
-                  table: "private_rooms",
-                  filter: `room_code=eq.${roomCode.toUpperCase()}`
-                },
-                (payload: any) => {
-                  if (payload.new.peer_id !== peer.id && isMounted) {
-                    connectToPeer(peer, stream, payload.new.peer_id);
-                    supabase.removeChannel(channel);
-                  }
-                }
-              )
-              .subscribe();
+            // We are player 1. Wait for player 2 to dial us.
+            console.log("First in room. Waiting for incoming call...");
           }
         });
 
