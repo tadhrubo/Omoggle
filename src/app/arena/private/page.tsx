@@ -228,7 +228,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
 
       {/* Timer & Phase Indicators */}
       {(phase === 'PREP' || phase === 'BATTLE') && (
-        <div style={{ position: "absolute", top: "80px", left: "50%", transform: "translateX(-50%)", zIndex: 50, display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+        <div style={{ position: "fixed", top: "80px", left: "50%", transform: "translateX(-50%)", zIndex: 50, display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
           <div style={{ color: "white", fontWeight: "900", letterSpacing: "5px", fontSize: "14px", backgroundColor: "rgba(0,0,0,0.5)", padding: "5px 15px", borderRadius: "99px" }}>
             {phase === 'PREP' ? 'GET READY' : 'MOGGING...'}
           </div>
@@ -240,7 +240,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
 
       {/* Result Overlay */}
       {phase === "RESULT" && verdict && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 100, backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           <h1 style={{ fontSize: "5.5rem", fontWeight: 900, color: verdict.color, textShadow: `0 0 30px ${verdict.color}80`, margin: 0, textAlign: "center", lineHeight: 1.1 }}>
             {myScore !== null && opponentScore !== null && myScore > opponentScore ? "YOU MOGGED" : (myScore !== null && opponentScore !== null && myScore < opponentScore ? "MOGGED" : "STALEMATE")}
           </h1>
@@ -291,9 +291,9 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         <div style={{ width: "60px" }}></div>
       </div>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', width: '100%', height: '100vh', overflow: 'hidden' }}>
         {/* Top: Opponent View */}
-        <div style={{ flex: 1, position: "relative", backgroundColor: "#000" }}>
+        <div style={{ flex: '1 1 500px', height: '100%', minHeight: '50vh', position: 'relative', backgroundColor: "#000" }}>
           {isSearching && (
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#22c55e", zIndex: 10, gap: "15px" }}>
               <div style={{ width: "60px", height: "60px", border: "3px solid #18181b", borderTopColor: "#22c55e", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
@@ -306,7 +306,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
               {error && <span style={{ color: "#ef4444", fontSize: "12px" }}>{error}</span>}
             </div>
           )}
-          <video ref={remoteVideoRef} autoPlay playsInline style={{ position: "absolute", width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />
+          <video ref={remoteVideoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', transform: "scaleX(-1)" }} />
           {remoteProfile && (
             <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
               <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{remoteProfile.name}</div>
@@ -318,8 +318,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         </div>
 
         {/* Bottom: Local View */}
-        <div style={{ flex: 1, position: "relative", backgroundColor: "#000", borderTop: "2px solid #27272a" }}>
-          <video ref={localVideoRef} autoPlay playsInline muted onLoadedData={handleLocalVideoReady} style={{ position: "absolute", width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />
+        <div style={{ flex: '1 1 500px', height: '100%', minHeight: '50vh', position: 'relative', backgroundColor: "#000", borderTop: "2px solid #27272a" }}>
+          <video ref={localVideoRef} autoPlay playsInline muted onLoadedData={handleLocalVideoReady} style={{ width: '100%', height: '100%', objectFit: 'cover', transform: "scaleX(-1)" }} />
           <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 2, pointerEvents: "none", transform: "scaleX(-1)" }} />
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
             <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{localProfile.name}</div>
