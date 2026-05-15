@@ -63,6 +63,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const localCanvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number | undefined>(undefined);
   const lastTelemetryTime = useRef(0);
+  const latestScoreRef = useRef<number>(5.0);
 
   const [battleState, setBattleState] = useState<'WAITING' | 'PLAYING' | 'SCORING' | 'RESULT'>('WAITING');
   const [timeLeft, setTimeLeft] = useState(10);
@@ -149,18 +150,13 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
               ctx.fillStyle = "#39FF14";
               pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
 
-              if (battleState === "PLAYING") {
-                if (timeMs - lastTelemetryTime.current > 150) {
-                  const score = calculateMogScore(result.faceLandmarks[0] as any).score;
-                  setLiveMyScore(score); sendTelemetry("LIVE_SCORE", { score });
-                  lastTelemetryTime.current = timeMs;
-                }
-              }
+              const score = calculateMogScore(result.faceLandmarks[0] as any).score;
+              latestScoreRef.current = score;
 
-              if (battleState === "SCORING" && myScore === null) {
-                const final = calculateMogScore(result.faceLandmarks[0] as any).score;
-                setMyScore(final);
-                sendTelemetry("FINAL_SCORE", { score: final });
+              if (timeMs - lastTelemetryTime.current > 150) {
+                setLiveMyScore(score); 
+                sendTelemetry("LIVE_SCORE", { score });
+                lastTelemetryTime.current = timeMs;
               }
             }
           }
@@ -172,22 +168,32 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   };
 
   useEffect(() => {
-    if (battleState === "PLAYING" && timeLeft > 0) {
+    if (battleState !== 'PLAYING') return;
+    
+    if (timeLeft > 0) {
       playTickSound();
-      const timer = setTimeout(() => setTimeLeft(c => c - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (battleState === "PLAYING" && timeLeft === 0) {
-      setBattleState("SCORING");
+      const timerId = setTimeout(() => setTimeLeft(prev => prev - 1), 1000);
+      return () => clearTimeout(timerId);
+    } else if (timeLeft === 0) {
+      // FORCE THE SCORING PHASE
+      setBattleState('SCORING');
+      
+      // 1. Grab the exact score from the millisecond the timer hit 0
+      const finalScore = latestScoreRef.current;
+      setMyScore(finalScore);
+      
+      // 2. Transmit it instantly to the remote peer
+      sendTelemetry('FINAL_SCORE', { score: finalScore });
     }
-  }, [battleState, timeLeft]);
+  }, [timeLeft, battleState, sendTelemetry]);
 
   useEffect(() => {
-    if (battleState === "SCORING" && myScore !== null && opponentScore !== null) {
+    if (myScore !== null && opponentScore !== null) {
       setBattleState("RESULT");
       const isWinner = myScore > opponentScore;
       playResultSound(isWinner);
     }
-  }, [battleState, myScore, opponentScore]);
+  }, [myScore, opponentScore]);
 
   const verdict = myScore !== null && opponentScore !== null ? getMatchVerdict(myScore, opponentScore) : null;
 
