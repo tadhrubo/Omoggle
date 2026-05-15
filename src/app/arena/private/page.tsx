@@ -67,6 +67,12 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
 
   type Phase = 'WAITING' | 'PREP' | 'BATTLE' | 'SCORING' | 'RESULT';
   const [phase, setPhase] = useState<Phase>('WAITING');
+  const phaseRef = useRef<Phase>('WAITING');
+
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
   const [timer, setTimer] = useState<number>(0);
   const [myScore, setMyScore] = useState<number | null>(null);
   const [liveMyScore, setLiveMyScore] = useState<number | null>(null);
@@ -152,10 +158,11 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
               ctx.fillStyle = "#39FF14";
               pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
 
-              if (phase === 'BATTLE') {
+              if (phaseRef.current === 'BATTLE') {
                 const currentScore = calculateMogScore(result.faceLandmarks[0] as any).score;
                 if (currentScore > 1.0) {
                   scoreHistoryRef.current.push(currentScore);
+                  console.log("Captured frame score:", currentScore);
                 }
                 if (timeMs - lastTelemetryTime.current > 150) {
                   setLiveMyScore(currentScore); 
@@ -199,7 +206,9 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   useEffect(() => {
     if (phase === 'SCORING') {
       const scores = scoreHistoryRef.current;
-      let finalScore = 4.5;
+      console.log("Final array of scores collected:", scores); // Debugging
+
+      let finalScore = 4.5; // Default fallback
       if (scores.length > 0) {
         finalScore = Math.max(...scores);
       }
