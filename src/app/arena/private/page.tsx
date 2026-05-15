@@ -63,10 +63,11 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const localCanvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number | undefined>(undefined);
   const lastTelemetryTime = useRef(0);
-  const latestScoreRef = useRef<number>(5.0);
+  const scoreHistoryRef = useRef<number[]>([]);
 
-  const [battleState, setBattleState] = useState<'WAITING' | 'PLAYING' | 'SCORING' | 'RESULT'>('WAITING');
-  const [timeLeft, setTimeLeft] = useState(10);
+  type Phase = 'WAITING' | 'PREP' | 'BATTLE' | 'SCORING' | 'RESULT';
+  const [phase, setPhase] = useState<Phase>('WAITING');
+  const [timer, setTimer] = useState<number>(0);
   const [myScore, setMyScore] = useState<number | null>(null);
   const [liveMyScore, setLiveMyScore] = useState<number | null>(null);
 
@@ -77,10 +78,11 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
     roomCode,
     playerElo: localProfile.elo,
     onDisconnect: () => {
-      setBattleState('WAITING');
+      setPhase('WAITING');
       setMyScore(null);
       setLiveMyScore(null);
-      setTimeLeft(10);
+      setTimer(0);
+      scoreHistoryRef.current = [];
     }
   });
 
@@ -95,12 +97,12 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   }, [remoteStream]);
 
   useEffect(() => {
-    if (isConnected && battleState === "WAITING") {
+    if (isConnected && phase === 'WAITING') {
       sendTelemetry("PROFILE_SYNC", { profile: localProfile });
-      setBattleState("PLAYING");
-      setTimeLeft(10);
+      setPhase('PREP');
+      setTimer(5);
     }
-  }, [isConnected, battleState, sendTelemetry, localProfile]);
+  }, [isConnected, phase, sendTelemetry, localProfile]);
 
   const handleLocalVideoReady = () => {
     const loop = () => {
@@ -150,13 +152,16 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
               ctx.fillStyle = "#39FF14";
               pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
 
-              const score = calculateMogScore(result.faceLandmarks[0] as any).score;
-              latestScoreRef.current = score;
-
-              if (timeMs - lastTelemetryTime.current > 150) {
-                setLiveMyScore(score); 
-                sendTelemetry("LIVE_SCORE", { score });
-                lastTelemetryTime.current = timeMs;
+              if (phase === 'BATTLE') {
+                const currentScore = calculateMogScore(result.faceLandmarks[0] as any).score;
+                if (currentScore > 1.0) {
+                  scoreHistoryRef.current.push(currentScore);
+                }
+                if (timeMs - lastTelemetryTime.current > 150) {
+                  setLiveMyScore(currentScore); 
+                  sendTelemetry("LIVE_SCORE", { score: currentScore });
+                  lastTelemetryTime.current = timeMs;
+                }
               }
             }
           }
@@ -168,28 +173,49 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   };
 
   useEffect(() => {
-    if (battleState !== 'PLAYING') return;
-    
-    if (timeLeft > 0) {
-      playTickSound();
-      const timerId = setTimeout(() => setTimeLeft(prev => prev - 1), 1000);
-      return () => clearTimeout(timerId);
-    } else if (timeLeft === 0) {
-      // FORCE THE SCORING PHASE
-      setBattleState('SCORING');
+    if (phase === 'WAITING' || phase === 'SCORING' || phase === 'RESULT') return;
+
+    const interval = setInterval(() => {
+      setTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          if (phase === 'PREP') {
+            setPhase('BATTLE');
+            return 10;
+          }
+          if (phase === 'BATTLE') {
+            setPhase('SCORING');
+            return 0;
+          }
+        }
+        playTickSound();
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase === 'SCORING') {
+      const scores = scoreHistoryRef.current;
+      let finalScore = 4.5;
+      if (scores.length > 0) {
+        finalScore = Math.max(...scores);
+      }
       
-      // 1. Grab the exact score from the millisecond the timer hit 0
-      const finalScore = latestScoreRef.current;
+      finalScore = parseFloat(finalScore.toFixed(1));
       setMyScore(finalScore);
-      
-      // 2. Transmit it instantly to the remote peer
-      sendTelemetry('FINAL_SCORE', { score: finalScore });
+
+      if (sendTelemetry) {
+        sendTelemetry('FINAL_SCORE', { score: finalScore });
+      }
     }
-  }, [timeLeft, battleState, sendTelemetry]);
+  }, [phase, sendTelemetry]);
 
   useEffect(() => {
     if (myScore !== null && opponentScore !== null) {
-      setBattleState("RESULT");
+      setPhase("RESULT");
       const isWinner = myScore > opponentScore;
       playResultSound(isWinner);
     }
@@ -200,15 +226,20 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100vw", backgroundColor: "#09090b", overflow: "hidden", position: "relative" }}>
 
-      {/* 10-Second Timer Display */}
-      {battleState === "PLAYING" && (
-        <div style={{ position: "absolute", top: "80px", left: "50%", transform: "translateX(-50%)", zIndex: 50, fontSize: "4rem", fontWeight: "900", color: "#ef4444", textShadow: "0 0 20px #ef4444" }}>
-          {timeLeft}
+      {/* Timer & Phase Indicators */}
+      {(phase === 'PREP' || phase === 'BATTLE') && (
+        <div style={{ position: "absolute", top: "80px", left: "50%", transform: "translateX(-50%)", zIndex: 50, display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+          <div style={{ color: "white", fontWeight: "900", letterSpacing: "5px", fontSize: "14px", backgroundColor: "rgba(0,0,0,0.5)", padding: "5px 15px", borderRadius: "99px" }}>
+            {phase === 'PREP' ? 'GET READY' : 'MOGGING...'}
+          </div>
+          <div style={{ fontSize: "4rem", fontWeight: "900", color: "#ef4444", textShadow: "0 0 20px #ef4444" }}>
+            {timer}
+          </div>
         </div>
       )}
 
       {/* Result Overlay */}
-      {battleState === "RESULT" && verdict && (
+      {phase === "RESULT" && verdict && (
         <div style={{ position: "absolute", inset: 0, zIndex: 100, backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           <h1 style={{ fontSize: "5.5rem", fontWeight: 900, color: verdict.color, textShadow: `0 0 30px ${verdict.color}80`, margin: 0, textAlign: "center", lineHeight: 1.1 }}>
             {myScore !== null && opponentScore !== null && myScore > opponentScore ? "YOU MOGGED" : (myScore !== null && opponentScore !== null && myScore < opponentScore ? "MOGGED" : "STALEMATE")}
@@ -229,11 +260,11 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
           
           <div style={{ display: "flex", gap: "20px" }}>
             <button onClick={() => {
-                setBattleState("WAITING");
+                scoreHistoryRef.current = [];
                 setMyScore(null);
                 setLiveMyScore(null);
-                setTimeLeft(10);
-                if (isConnected) setBattleState("PLAYING");
+                setTimer(5);
+                setPhase('PREP');
             }} style={{ padding: "15px 30px", backgroundColor: "#22c55e", color: "white", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" }}>NEXT BATTLE</button>
             <button onClick={() => router.push("/lobby")} style={{ padding: "15px 30px", backgroundColor: "transparent", color: "white", border: "1px solid #27272a", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" }}>LEAVE</button>
           </div>
@@ -281,7 +312,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
               <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{remoteProfile.name}</div>
             </div>
           )}
-          {liveOpponentScore && (battleState === "PLAYING" || battleState === "SCORING") && (
+          {liveOpponentScore && (phase === "BATTLE" || phase === "SCORING") && (
             <div style={{ position: "absolute", bottom: 16, right: 16, zIndex: 20, color: "white", fontWeight: "900", fontSize: "4rem", opacity: 0.8 }}>{liveOpponentScore.toFixed(1)}</div>
           )}
         </div>
@@ -293,7 +324,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
             <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{localProfile.name}</div>
           </div>
-          {liveMyScore && (battleState === "PLAYING" || battleState === "SCORING") && (
+          {liveMyScore && (phase === "BATTLE" || phase === "SCORING") && (
             <div style={{ position: "absolute", bottom: 16, right: 16, zIndex: 20, color: "white", fontWeight: "900", fontSize: "4rem", opacity: 0.8 }}>{liveMyScore.toFixed(1)}</div>
           )}
         </div>
@@ -303,9 +334,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
       <div style={{ flex: "none", height: "80px", display: "flex", alignItems: "center", justifyContent: "center", gap: "20px", borderTop: "1px solid #27272a", backgroundColor: "#09090b", zIndex: 110 }}>
         <button onClick={() => router.push("/lobby")} style={{ backgroundColor: "transparent", color: "#71717a", fontWeight: "bold", fontSize: "14px", padding: "12px 24px", borderRadius: "99px", border: "1px solid #27272a", cursor: "pointer" }}>
           LEAVE ROOM
-        </button>
-        <button onClick={() => window.location.reload()} style={{ backgroundColor: "#22c55e", color: "white", fontWeight: "900", fontSize: "18px", padding: "12px 48px", borderRadius: "99px", border: "none", cursor: "pointer" }}>
-          {battleState === "RESULT" ? "REMATCH" : "SKIP"}
         </button>
       </div>
 
