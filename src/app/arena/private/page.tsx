@@ -38,19 +38,47 @@ const playResultSound = (isWin: boolean) => {
   });
 };
 
-const getMatchVerdict = (myScore: number, oppScore: number) => {
-  const diff = myScore - oppScore;
-  const absDiff = Math.abs(diff);
-  if (absDiff < 0.2) return { title: "STALEMATE", sub: "EQUAL LOOKSMAXXING", color: "#eab308" };
-  if (diff > 0) {
-    if (absDiff >= 2.0) return { title: "OBLITERATED", sub: "ABSOLUTE DOMINATION", color: "#39FF14" };
-    if (absDiff >= 1.0) return { title: "DOMINATED", sub: "CLEAR VICTORY", color: "#39FF14" };
-    return { title: "VICTORY", sub: "NARROW MOG", color: "#39FF14" };
+const getMatchVerdict = (localScore: number, remoteScore: number) => {
+  const delta = parseFloat((localScore - remoteScore).toFixed(1));
+  const absDelta = Math.abs(delta);
+
+  let resultTitle = "";
+  let resultSubtitle = "";
+  let titleColor = ""; 
+
+  if (delta === 0) {
+    resultTitle = "STALEMATE";
+    resultSubtitle = "EQUAL LOOKSMAXXING";
+    titleColor = "#fbbf24"; // Yellow
+  } else if (delta > 0) {
+    // --- VICTORY TIERS ---
+    titleColor = "#22c55e"; // Green
+    if (absDelta <= 0.5) {
+      resultTitle = "NARROW MOG";
+      resultSubtitle = "IT WAS CLOSE, BUT YOU SURVIVED";
+    } else if (absDelta <= 1.5) {
+      resultTitle = "YOU MOGGED";
+      resultSubtitle = "CLEAN VICTORY";
+    } else {
+      resultTitle = "OBLITERATED";
+      resultSubtitle = "ABSOLUTE GENETIC DOMINANCE";
+    }
   } else {
-    if (absDiff >= 2.0) return { title: "IT'S OVER", sub: "BRUTALLY MOGGED", color: "#ef4444" };
-    if (absDiff >= 1.0) return { title: "BRUTALIZED", sub: "NO COMPETITION", color: "#ef4444" };
-    return { title: "MOGGED", sub: "BETTER LUCK NEXT TIME", color: "#ef4444" };
+    // --- DEFEAT TIERS ---
+    titleColor = "#ef4444"; // Red
+    if (absDelta <= 0.5) {
+      resultTitle = "BARELY MOGGED";
+      resultSubtitle = "A MARGINAL DEFEAT";
+    } else if (absDelta <= 1.5) {
+      resultTitle = "COOKED";
+      resultSubtitle = "YOU GOT MOGGED";
+    } else {
+      resultTitle = "IT'S OVER";
+      resultSubtitle = "A BRUTAL SLAUGHTER";
+    }
   }
+  
+  return { title: resultTitle, sub: resultSubtitle, color: titleColor };
 };
 
 // ============================================================================
@@ -251,7 +279,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
       {phase === "RESULT" && verdict && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           <h1 style={{ fontSize: "5.5rem", fontWeight: 900, color: verdict.color, textShadow: `0 0 30px ${verdict.color}80`, margin: 0, textAlign: "center", lineHeight: 1.1 }}>
-            {myScore !== null && opponentScore !== null && myScore > opponentScore ? "YOU MOGGED" : (myScore !== null && opponentScore !== null && myScore < opponentScore ? "MOGGED" : "STALEMATE")}
+            {verdict.title}
           </h1>
           <div style={{ color: "white", fontWeight: "bold", letterSpacing: "5px", marginBottom: "30px", opacity: 0.9 }}>{verdict.sub}</div>
 
