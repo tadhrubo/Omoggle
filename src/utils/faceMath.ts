@@ -166,18 +166,11 @@ export function calculateMogScore(landmarks: Landmark[]): number {
   // Final score capped at 9.9
   const finalScore = Math.min(9.9, baseScore + viralVariance);
 
-  // --- THE EGO BUFF CURVE ---
-  let buffedScore = finalScore;
-  if (finalScore < 4.0) {
-    buffedScore = finalScore * 1.5;
-  } else if (finalScore >= 4.0 && finalScore < 6.0) {
-    buffedScore = finalScore * 1.35;
-  } else if (finalScore >= 6.0) {
-    buffedScore = finalScore * 1.2;
-  }
+  // Clamp the authentic raw score to a realistic max of 9.9 and min of 1.0
+  const clampedScore = Math.max(1.0, Math.min(finalScore, 9.9));
 
-  buffedScore = Math.min(buffedScore, 9.9);
-  return parseFloat(buffedScore.toFixed(1));
+  // Return the raw, unbuffed score formatted to 1 decimal place
+  return parseFloat(clampedScore.toFixed(1));
 }
 
 /**
