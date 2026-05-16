@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function LogoHomeButton() {
   return (
@@ -17,12 +18,13 @@ export default function LogoHomeButton() {
       onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
       onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
     >
-      <img
+      <Image
         src="/logo.png"
         alt="Omoggle Logo"
+        width={48}
+        height={48}
+        priority
         style={{
-          width: "48px",
-          height: "48px",
           borderRadius: "12px",
           boxShadow: "0 0 20px rgba(239, 68, 68, 0.3)",
           border: "1px solid rgba(255,255,255,0.1)",

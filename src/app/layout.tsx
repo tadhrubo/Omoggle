@@ -2,12 +2,25 @@ import "./globals.css"; // CRITICAL: Do not remove this, or your site loses all 
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import LogoHomeButton from "./components/LogoHomeButton";
+import { Bebas_Neue, Inter } from "next/font/google";
+
+const bebas = Bebas_Neue({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-bebas",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+});
 
 // ─── VIEWPORT (separated from Metadata per Next.js 14+ best practice) ────────
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: "#080A0F" },
     { media: "(prefers-color-scheme: light)", color: "#080A0F" },
@@ -247,17 +260,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${bebas.variable} ${inter.variable}`}>
       <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
         />
         <link rel="dns-prefetch" href="https://discord.gg" />
       </head>

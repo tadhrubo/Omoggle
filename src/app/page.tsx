@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Swords, LogOut, User, X, Settings } from "lucide-react";
 import AgeGate from "@/components/AgeGate";
 import Link from "next/link";
+import Image from "next/image";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
 // ─── FAQ ACCORDION ─────────────────────────────────────────────────────────
@@ -269,7 +270,7 @@ export default function Home() {
               onMouseOver={(e) => e.currentTarget.style.opacity = "0.7"}
               onMouseOut={(e) => e.currentTarget.style.opacity = "1"}
             >
-              <img src={displayAvatar} alt="Avatar" style={{ width: "32px", height: "32px", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.1)", objectFit: "cover" }} />
+              {displayAvatar && <Image src={displayAvatar} alt="Avatar" width={32} height={32} style={{ borderRadius: "50%", border: "1px solid rgba(255,255,255,0.1)", objectFit: "cover" }} />}
               <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
                 <span style={{ fontSize: "14px", fontWeight: "900", color: "white", lineHeight: "1" }}>{displayName}</span>
                 <span style={{ fontSize: "10px", color: "#a1a1aa", fontFamily: "monospace", marginTop: "2px" }}>
@@ -301,11 +302,11 @@ export default function Home() {
       {/* --- HERO CONTENT --- */}
       <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "4px", marginBottom: "30px", display: "flex", alignItems: "center", gap: "10px" }}><span>♦</span> FACE THE COMPETITION <span>♦</span></div>
 
-      <div style={{ textAlign: "center", lineHeight: "1.1", marginBottom: "30px" }}>
-        <h1 style={{ fontSize: "clamp(5rem, 15vw, 9rem)", fontWeight: "400", margin: 0, letterSpacing: "-2px" }}>MOG</h1>
-        <h1 style={{ fontSize: "clamp(5rem, 15vw, 9rem)", fontWeight: "400", margin: 0, color: "#ef4444", textShadow: "0 0 40px rgba(239, 68, 68, 0.6)" }}>OR</h1>
-        <h1 style={{ fontSize: "clamp(4rem, 12vw, 8rem)", fontWeight: "400", margin: 0, letterSpacing: "-2px" }}>BE MOGGED</h1>
-      </div>
+      <h1 style={{ textAlign: "center", lineHeight: "1.1", marginBottom: "30px", margin: 0 }}>
+        <span style={{ fontSize: "clamp(5rem, 15vw, 9rem)", fontWeight: "400", letterSpacing: "-2px", display: "block" }}>MOG</span>
+        <span style={{ fontSize: "clamp(5rem, 15vw, 9rem)", fontWeight: "400", color: "#ef4444", textShadow: "0 0 40px rgba(239, 68, 68, 0.6)", display: "block" }}>OR</span>
+        <span style={{ fontSize: "clamp(4rem, 12vw, 8rem)", fontWeight: "400", letterSpacing: "-2px", display: "block" }}>BE MOGGED</span>
+      </h1>
 
       <div style={{ color: "#71717a", fontSize: "12px", letterSpacing: "2px", marginBottom: "40px", fontFamily: "monospace" }}>anonymous • real-time • unfiltered</div>
 

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import Image from "next/image";
 import { Flame, Trophy, Skull, Eye, Swords, Crown, ArrowLeft, Target } from "lucide-react";
 
 const getTier = (elo: number) => {
@@ -147,7 +148,7 @@ export default function ProfilePage() {
               boxShadow: isOnFire ? undefined : `0 0 20px ${tier.color}30`
             }}>
               {profile.avatar_url
-                ? <img src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ? <Image src={profile.avatar_url} alt="" fill style={{ objectFit: "cover" }} />
                 : <div style={{ width: "100%", height: "100%", backgroundColor: "#27272a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "40px", fontWeight: "900", color: tier.color }}>{(profile.username || "?")[0].toUpperCase()}</div>
               }
             </div>
@@ -227,7 +228,7 @@ export default function ProfilePage() {
                 {/* Opponent Avatar */}
                 <div style={{ width: "44px", height: "44px", borderRadius: "50%", overflow: "hidden", flexShrink: 0, position: "relative", filter: m.isWin ? "grayscale(100%)" : "none", opacity: m.isWin ? 0.6 : 1 }}>
                   {m.opponent?.avatar_url
-                    ? <img src={m.opponent.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ? <Image src={m.opponent.avatar_url} alt="" fill style={{ objectFit: "cover" }} />
                     : <div style={{ width: "100%", height: "100%", backgroundColor: "#27272a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: "900", color: "#52525b" }}>{(m.opponent?.username || "?")[0]}</div>
                   }
                 </div>
@@ -273,7 +274,7 @@ export default function ProfilePage() {
                 }}>
                   <div style={{ width: "48px", height: "48px", borderRadius: "50%", overflow: "hidden", border: `2px solid ${nTier.color}` }}>
                     {n.nemesis?.avatar_url
-                      ? <img src={n.nemesis.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ? <Image src={n.nemesis.avatar_url} alt="" fill style={{ objectFit: "cover" }} />
                       : <div style={{ width: "100%", height: "100%", backgroundColor: "#27272a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", fontWeight: "900", color: nTier.color }}>{(n.nemesis?.username || "?")[0]}</div>
                     }
                   </div>
