@@ -97,6 +97,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const lastTelemetryTime = useRef(0);
   const scoreHistoryRef = useRef<number[]>([]);
   const cardRef = useRef<HTMLDivElement>(null);
+  const [preloadedShareFile, setPreloadedShareFile] = useState<File | null>(null);
+  const [isPreloading, setIsPreloading] = useState(false);
 
   const handleDownloadCard = async () => {
     if (!cardRef.current) return;
@@ -115,24 +117,19 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   };
 
   const handleNativeShare = async () => {
-    if (cardRef.current === null) return;
-    try {
-      const dataUrl = await toPng(cardRef.current, { quality: 1.0, pixelRatio: 1 });
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      const file = new File([blob], "mog-victory.png", { type: "image/png" });
-
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    if (preloadedShareFile && navigator.canShare && navigator.canShare({ files: [preloadedShareFile] })) {
+      try {
         await navigator.share({
-          title: 'Mog Battle Victory',
-          text: 'I just mogged the arena. Face the scanner if you dare.',
-          files: [file]
+          title: 'Mog Battle Result',
+          text: 'I just faced the scanner. Do you have the genetics to beat my score?',
+          files: [preloadedShareFile]
         });
-      } else {
-        handleDownloadCard(); 
+      } catch (err) {
+        console.log('User cancelled share or share failed', err);
       }
-    } catch (err) {
-      console.error('Failed to share card', err);
+    } else {
+      // Fallback if preloading isn't done yet or desktop doesn't support sharing
+      handleDownloadCard(); 
     }
   };
 
@@ -142,6 +139,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
     setLiveMyScore(null);
     setTimer(5);
     setPhase('PREP');
+    setPreloadedShareFile(null); // Reset share file for next round
   };
 
   type Phase = 'WAITING' | 'PREP' | 'BATTLE' | 'SCORING' | 'RESULT';
@@ -151,6 +149,29 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
+
+  // Background Pre-render for Share Card
+  useEffect(() => {
+    if (phase === 'RESULT' && !preloadedShareFile && !isPreloading) {
+      setIsPreloading(true);
+      
+      // Give the DOM 500ms to fully paint the hidden share card before capturing
+      setTimeout(async () => {
+        if (!cardRef.current) return;
+        try {
+          const dataUrl = await toPng(cardRef.current, { quality: 0.9, pixelRatio: 1 });
+          const res = await fetch(dataUrl);
+          const blob = await res.blob();
+          const file = new File([blob], "mog-victory.png", { type: "image/png" });
+          setPreloadedShareFile(file);
+        } catch (err) {
+          console.error("Background pre-render failed", err);
+        } finally {
+          setIsPreloading(false);
+        }
+      }, 500); 
+    }
+  }, [phase, preloadedShareFile, isPreloading]);
 
   const [timer, setTimer] = useState<number>(0);
   const [myScore, setMyScore] = useState<number | null>(null);
@@ -363,7 +384,31 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
           
           <div style={{ display: "flex", gap: "20px", marginBottom: "20px" }}>
             <button onClick={handleDownloadCard} style={{ padding: "12px 24px", backgroundColor: "white", color: "black", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>DOWNLOAD</button>
-            <button onClick={handleNativeShare} style={{ padding: "12px 24px", backgroundColor: "#a855f7", color: "white", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>SHARE RESULT</button>
+            <button 
+              onClick={handleNativeShare} 
+              disabled={isPreloading && !preloadedShareFile}
+              style={{ 
+                padding: "12px 24px", 
+                backgroundColor: "#a855f7", 
+                color: "white", 
+                border: "none", 
+                borderRadius: "8px", 
+                fontWeight: "bold", 
+                cursor: (isPreloading && !preloadedShareFile) ? "not-allowed" : "pointer", 
+                fontSize: "14px",
+                opacity: (isPreloading && !preloadedShareFile) ? 0.5 : 1,
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+              {(isPreloading && !preloadedShareFile) ? (
+                <>
+                  <div style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%", animation: "spin 0.6s linear infinite" }}></div>
+                  PREPARING...
+                </>
+              ) : "SHARE RESULT"}
+            </button>
           </div>
 
           <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
