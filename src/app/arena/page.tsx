@@ -288,9 +288,9 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
         <div style={{ width: "60px" }}></div>
       </div>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        {/* Top: Opponent View */}
-        <div style={{ flex: 1, position: "relative", backgroundColor: "#000" }}>
+      <div className="flex flex-col md:flex-row w-full h-full flex-1 overflow-hidden">
+        {/* Top/Left: Opponent View */}
+        <div className="relative flex-1 w-full md:w-1/2 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-zinc-800 bg-black">
           {isSearching && (
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: mode === "ranked" ? "#fbbf24" : "#ef4444", zIndex: 10 }}>
               <span style={{ fontFamily: "monospace", letterSpacing: "2px", fontWeight: "bold" }}>
@@ -311,8 +311,8 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
           )}
         </div>
 
-        {/* Bottom: Local View */}
-        <div style={{ flex: 1, position: "relative", backgroundColor: "#000", borderTop: "2px solid #27272a" }}>
+        {/* Bottom/Right: Local View */}
+        <div className="relative flex-1 w-full md:w-1/2 h-1/2 md:h-full bg-black">
           <video ref={localVideoRef} autoPlay playsInline muted onLoadedData={handleLocalVideoReady} style={{ position: "absolute", width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />
           <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 2, pointerEvents: "none", transform: "scaleX(-1)" }} />
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
