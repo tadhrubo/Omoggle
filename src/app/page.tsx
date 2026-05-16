@@ -7,6 +7,13 @@ import AgeGate from "@/components/AgeGate";
 import Link from "next/link";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
+// Static featured posts for the homepage SEO cluster
+// Full dynamic listing is at /blog — these are the two priority posts
+const featuredBlogs = [
+  { slug: "blog-how-psl-rating-works", category: "STRATEGY", title: "How PSL Rating Actually Works", description: "Symmetry, harmony, jawline, canthal tilt — understand the metrics that determine who wins the battle." },
+  { slug: "blog-omegle-alternatives-2026", category: "CULTURE", title: "Omegle Alternatives in 2026", description: "From basic chatroulettes to ranked arenas. A quick map of the random-video landscape after Omegle shut down." },
+];
+
 /**
  * PRESTIGE HIERARCHY UTILITY
  * Single source of truth for Ranks and Visual Styles
@@ -329,44 +336,24 @@ export default function Home() {
         <div style={{ marginBottom: "60px" }}>
           <h2 style={{ fontSize: "1.8rem", fontWeight: "900", color: "white", marginBottom: "30px", borderBottom: "1px solid #27272a", paddingBottom: "15px" }}>READ UP BEFORE YOU QUEUE</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
-            
-            <Link href="/blog/how-psl-rating-works" style={{ textDecoration: "none" }}>
-              <div style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid #27272a", borderRadius: "16px", padding: "24px", transition: "border-color 0.2s", cursor: "pointer", height: "100%" }} onMouseOver={(e) => e.currentTarget.style.borderColor = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.borderColor = "#27272a"}>
-                <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "2px", marginBottom: "10px" }}>STRATEGY</div>
-                <h3 style={{ color: "white", fontSize: "1.2rem", fontWeight: "bold", margin: "0 0 10px 0" }}>How PSL Rating Actually Works</h3>
-                <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.5", margin: "0 0 20px 0" }}>Symmetry, harmony, jawline, canthal tilt — understand the metrics that determine who wins the battle.</p>
-                <span style={{ color: "#ef4444", fontSize: "12px", fontWeight: "bold" }}>READ ARTICLE →</span>
-              </div>
-            </Link>
-
-            <Link href="/blog/omegle-alternatives-2026" style={{ textDecoration: "none" }}>
-              <div style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid #27272a", borderRadius: "16px", padding: "24px", transition: "border-color 0.2s", cursor: "pointer", height: "100%" }} onMouseOver={(e) => e.currentTarget.style.borderColor = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.borderColor = "#27272a"}>
-                <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "2px", marginBottom: "10px" }}>CULTURE</div>
-                <h3 style={{ color: "white", fontSize: "1.2rem", fontWeight: "bold", margin: "0 0 10px 0" }}>Omegle Alternatives in 2026</h3>
-                <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.5", margin: "0 0 20px 0" }}>From basic chatroulettes to ranked arenas. A quick map of the random-video landscape after Omegle shut down.</p>
-                <span style={{ color: "#ef4444", fontSize: "12px", fontWeight: "bold" }}>READ ARTICLE →</span>
-              </div>
-            </Link>
-
+            {featuredBlogs.map((blog) => (
+              <Link href={`/blog/${blog.slug}`} key={blog.slug} style={{ textDecoration: "none" }}>
+                <div style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid #27272a", borderRadius: "16px", padding: "24px", transition: "border-color 0.2s", cursor: "pointer", height: "100%" }} onMouseOver={(e) => e.currentTarget.style.borderColor = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.borderColor = "#27272a"}>
+                  <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "2px", marginBottom: "10px" }}>{blog.category}</div>
+                  <h3 style={{ color: "white", fontSize: "1.2rem", fontWeight: "bold", margin: "0 0 10px 0" }}>{blog.title}</h3>
+                  <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.5", margin: "0 0 20px 0" }}>{blog.description}</p>
+                  <span style={{ color: "#ef4444", fontSize: "12px", fontWeight: "bold" }}>READ ARTICLE →</span>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
-        {/* FAQ ACCORDION */}
+
+        {/* FAQ */}
         <div>
           <h2 style={{ fontSize: "1.8rem", fontWeight: "900", color: "white", marginBottom: "30px", borderBottom: "1px solid #27272a", paddingBottom: "15px" }}>FREQUENTLY ASKED QUESTIONS</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-            {[
-              { q: "What is Omoggle?", a: "Omoggle is a competitive 1v1 video chat arena. Unlike traditional random chat sites, we feature a live Elo ranking system where the community votes on who wins the face-off." },
-              { q: "How is Omoggle different from Omegle?", a: "Omegle was entirely random and unmoderated. Omoggle introduces stakes, ranked matchmaking, user profiles, and a global leaderboard to turn video chat into a competitive game." },
-              { q: "Is it safe? Do you record video?", a: "Your safety and privacy are paramount. We use Peer-to-Peer (WebRTC) technology, meaning video streams connect directly between users. We do not record or store your camera feed." },
-              { q: "Do I need an account to play?", a: "No, you can enter the Casual Arena as a Guest. However, if you want to climb the ranks, track your Elo, and appear on the Leaderboard, you need to sign in with Google." }
-            ].map((faq, i) => (
-              <details key={i} style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid #27272a", borderRadius: "12px", padding: "20px", cursor: "pointer" }}>
-                <summary style={{ color: "white", fontSize: "16px", fontWeight: "bold", outline: "none", listStyle: "none", display: "flex", justifyContent: "space-between" }}>
-                  {faq.q} <span style={{ color: "#71717a" }}>+</span>
-                </summary>
-                <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.6", margin: "15px 0 0 0" }}>{faq.a}</p>
-              </details>
-            ))}
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <Link href="/faq" className="px-8 py-4 bg-zinc-900 border border-zinc-700 rounded-lg text-white font-bold hover:bg-zinc-800 transition-colors">Read the Full FAQ</Link>
           </div>
         </div>
       </div>
