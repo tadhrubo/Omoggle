@@ -185,7 +185,8 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect, onRem
         peerRef.current.destroy();
       }
     };
-  }, [roomCode, setupDataConnection, playerElo, supabase]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomCode, playerElo]); 
 
   return {
     localStream,
