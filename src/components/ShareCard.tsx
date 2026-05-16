@@ -48,7 +48,7 @@ export default function ShareCard({
       {/* Logo */}
       <div className="absolute top-24 right-16 z-10">
         <img 
-          src="/logo_nobg.png" 
+          src="/logo.png" 
           alt="Mog Logo" 
           className="h-24 object-contain" 
           crossOrigin="anonymous" 
