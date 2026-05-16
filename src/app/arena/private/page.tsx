@@ -6,6 +6,8 @@ import { useFaceScanner } from "@/hooks/useFaceScanner";
 import { calculateMogScore } from "@/utils/faceMath";
 import { createClient } from "@/lib/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import ShareCard from "@/components/ShareCard";
+import { toPng } from "html-to-image";
 
 const SLEEK_INDICES = [10, 152, 234, 454, 132, 361, 33, 263, 4, 61, 291];
 
@@ -94,6 +96,23 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const requestRef = useRef<number | undefined>(undefined);
   const lastTelemetryTime = useRef(0);
   const scoreHistoryRef = useRef<number[]>([]);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const handleDownloadCard = async () => {
+    if (!cardRef.current) return;
+    try {
+      const dataUrl = await toPng(cardRef.current, { 
+        quality: 1.0,
+        pixelRatio: 1 
+      });
+      const link = document.createElement('a');
+      link.download = `omoggle-victory-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Failed to generate card', err);
+    }
+  };
 
   type Phase = 'WAITING' | 'PREP' | 'BATTLE' | 'SCORING' | 'RESULT';
   const [phase, setPhase] = useState<Phase>('WAITING');
@@ -318,10 +337,25 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
                 setTimer(5);
                 setPhase('PREP');
             }} style={{ padding: "15px 30px", backgroundColor: "#22c55e", color: "white", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" }}>NEXT BATTLE</button>
+            <button onClick={handleDownloadCard} style={{ padding: "15px 30px", backgroundColor: "white", color: "black", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" }}>DOWNLOAD CARD</button>
             <button onClick={() => router.push("/lobby")} style={{ padding: "15px 30px", backgroundColor: "transparent", color: "white", border: "1px solid #27272a", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" }}>LEAVE</button>
           </div>
         </div>
       )}
+
+      {/* Hidden Share Card for Capture */}
+      <div style={{ position: "absolute", left: "-9999px", top: 0, pointerEvents: "none" }}>
+        <div ref={cardRef}>
+          <ShareCard 
+            playerName={localProfile.name}
+            opponentName={remoteProfile?.name}
+            winRate={85}
+            score={myScore || 0}
+            elo={localProfile.elo}
+            challengeLink={typeof window !== 'undefined' ? window.location.href : ''}
+          />
+        </div>
+      </div>
 
       {/* Header */}
       <div style={{ flex: "none", height: "60px", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px 0 85px", borderBottom: "1px solid #27272a" }}>
