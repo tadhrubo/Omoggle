@@ -335,7 +335,7 @@ export default function Home() {
         <div style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid #27272a", borderRadius: "16px", padding: "20px", display: "flex", alignItems: "flex-start", gap: "15px" }}>
           <div style={{ backgroundColor: "rgba(34, 197, 94, 0.1)", color: "#22c55e", width: "30px", height: "30px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "900", flexShrink: 0 }}>1</div>
           <div>
-            <h3 style={{ color: "white", fontSize: "14px", fontWeight: "bold", margin: "0 0 5px 0", letterSpacing: "1px" }}>CAMERA CHECK</h3>
+            <h2 style={{ color: "white", fontSize: "14px", fontWeight: "bold", margin: "0 0 5px 0", letterSpacing: "1px" }}>CAMERA CHECK</h2>
             <p style={{ color: "#a1a1aa", fontSize: "12px", lineHeight: "1.4", margin: 0 }}>Ensure your stream is flawless before entering the live arena.</p>
           </div>
         </div>

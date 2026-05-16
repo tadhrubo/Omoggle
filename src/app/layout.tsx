@@ -266,6 +266,7 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
+        <link rel="preconnect" href="https://nzucpacdzzjzoeyyzban.supabase.co" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://discord.gg" />
       </head>
 
@@ -278,9 +279,9 @@ export default function RootLayout({
           <>
             <Script
               src="https://www.googletagmanager.com/gtag/js?id=G-SQ0GMRNGJ6"
-              strategy="afterInteractive"
+              strategy="lazyOnload"
             />
-            <Script id="google-analytics" strategy="afterInteractive">
+            <Script id="google-analytics" strategy="lazyOnload">
               {`
                 window.dataLayer = window.dataLayer || [];
                 function gtag(){window.dataLayer.push(arguments);}
