@@ -114,6 +114,36 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
     }
   };
 
+  const handleNativeShare = async () => {
+    if (cardRef.current === null) return;
+    try {
+      const dataUrl = await toPng(cardRef.current, { quality: 1.0, pixelRatio: 1 });
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], "mog-victory.png", { type: "image/png" });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: 'Mog Battle Victory',
+          text: 'I just mogged the arena. Face the scanner if you dare.',
+          files: [file]
+        });
+      } else {
+        handleDownloadCard(); 
+      }
+    } catch (err) {
+      console.error('Failed to share card', err);
+    }
+  };
+
+  const startNewBattle = () => {
+    scoreHistoryRef.current = [];
+    setMyScore(null);
+    setLiveMyScore(null);
+    setTimer(5);
+    setPhase('PREP');
+  };
+
   type Phase = 'WAITING' | 'PREP' | 'BATTLE' | 'SCORING' | 'RESULT';
   const [phase, setPhase] = useState<Phase>('WAITING');
   const phaseRef = useRef<Phase>('WAITING');
@@ -128,7 +158,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
 
   const {
     localStream, remoteStream, isSearching, isConnected,
-    opponentScore, liveOpponentScore, remoteProfile, skip, sendTelemetry, error
+    opponentScore, liveOpponentScore, remoteProfile, skip, sendTelemetry, error,
+    rematchState, requestRematch, acceptRematch
   } = usePrivateRoom({
     roomCode,
     playerElo: localProfile.elo,
@@ -138,7 +169,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
       setLiveMyScore(null);
       setTimer(0);
       scoreHistoryRef.current = [];
-    }
+    },
+    onRematch: startNewBattle
   });
 
   const { isLoaded, detect } = useFaceScanner({ enabled: true });
@@ -329,15 +361,27 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
             </div>
           </div>
           
-          <div style={{ display: "flex", gap: "20px" }}>
-            <button onClick={() => {
-                scoreHistoryRef.current = [];
-                setMyScore(null);
-                setLiveMyScore(null);
-                setTimer(5);
-                setPhase('PREP');
-            }} style={{ padding: "15px 30px", backgroundColor: "#22c55e", color: "white", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" }}>NEXT BATTLE</button>
-            <button onClick={handleDownloadCard} style={{ padding: "15px 30px", backgroundColor: "white", color: "black", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" }}>DOWNLOAD CARD</button>
+          <div style={{ display: "flex", gap: "20px", marginBottom: "20px" }}>
+            <button onClick={handleDownloadCard} style={{ padding: "12px 24px", backgroundColor: "white", color: "black", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>DOWNLOAD</button>
+            <button onClick={handleNativeShare} style={{ padding: "12px 24px", backgroundColor: "#a855f7", color: "white", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>SHARE RESULT</button>
+          </div>
+
+          <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
+            {rematchState === 'idle' && (
+              <button onClick={requestRematch} style={{ padding: "15px 30px", backgroundColor: "#22c55e", color: "white", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" }}>DEMAND REMATCH</button>
+            )}
+
+            {rematchState === 'requested_by_me' && (
+              <div style={{ color: "#22c55e", fontWeight: "bold", animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite" }}>WAITING FOR OPPONENT...</div>
+            )}
+
+            {rematchState === 'requested_by_opponent' && (
+              <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
+                <span style={{ color: "#fbbf24", fontWeight: "bold" }}>OPPONENT WANTS A REMATCH!</span>
+                <button onClick={acceptRematch} style={{ padding: "12px 24px", backgroundColor: "#fbbf24", color: "black", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>ACCEPT</button>
+              </div>
+            )}
+            
             <button onClick={() => router.push("/lobby")} style={{ padding: "15px 30px", backgroundColor: "transparent", color: "white", border: "1px solid #27272a", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" }}>LEAVE</button>
           </div>
         </div>

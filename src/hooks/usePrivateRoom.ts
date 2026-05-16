@@ -7,9 +7,10 @@ interface PrivateRoomProps {
   roomCode: string;
   playerElo?: number;
   onDisconnect?: () => void;
+  onRematch?: () => void;
 }
 
-export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect }: PrivateRoomProps) {
+export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect, onRematch }: PrivateRoomProps) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isWaiting, setIsWaiting] = useState(true);
@@ -18,6 +19,7 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect }: Pri
   const [liveOpponentScore, setLiveOpponentScore] = useState<number | null>(null);
   const [remoteProfile, setRemoteProfile] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rematchState, setRematchState] = useState<'idle' | 'requested_by_me' | 'requested_by_opponent'>('idle');
 
   const peerRef = useRef<Peer | null>(null);
   const callRef = useRef<MediaConnection | null>(null);
@@ -26,6 +28,21 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect }: Pri
 
   const supabase = createClient();
 
+  const sendTelemetry = useCallback((type: string, payload: any) => {
+    if (dataConnRef.current?.open) dataConnRef.current.send({ type, ...payload });
+  }, []);
+
+  const requestRematch = useCallback(() => {
+    sendTelemetry("REMATCH_REQUEST", {});
+    setRematchState('requested_by_me');
+  }, [sendTelemetry]);
+
+  const acceptRematch = useCallback(() => {
+    sendTelemetry("REMATCH_ACCEPT", {});
+    setRematchState('idle');
+    if (onRematch) onRematch();
+  }, [sendTelemetry, onRematch]);
+
   const setupDataConnection = useCallback((conn: DataConnection) => {
     dataConnRef.current = conn;
     conn.on("data", (data: any) => {
@@ -33,8 +50,16 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect }: Pri
       if (data.type === "PROFILE_SYNC") setRemoteProfile(data.profile);
       if (data.type === "LIVE_SCORE") setLiveOpponentScore(data.score);
       if (data.type === "FINAL_SCORE") setOpponentScore(data.score);
+      
+      if (data.type === "REMATCH_REQUEST") {
+        setRematchState('requested_by_opponent');
+      }
+      if (data.type === "REMATCH_ACCEPT") {
+        setRematchState('idle');
+        if (onRematch) onRematch();
+      }
     });
-  }, []);
+  }, [onRematch]);
 
   useEffect(() => {
     if (!roomCode) return;
@@ -160,11 +185,7 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect }: Pri
         peerRef.current.destroy();
       }
     };
-  }, [roomCode, setupDataConnection, playerElo]);
-
-  const sendTelemetry = (type: string, payload: any) => {
-    if (dataConnRef.current?.open) dataConnRef.current.send({ type, ...payload });
-  };
+  }, [roomCode, setupDataConnection, playerElo, supabase]);
 
   return {
     localStream,
@@ -175,6 +196,9 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect }: Pri
     liveOpponentScore,
     remoteProfile,
     sendTelemetry,
+    rematchState,
+    requestRematch,
+    acceptRematch,
     error,
     skip: () => window.location.reload()
   };

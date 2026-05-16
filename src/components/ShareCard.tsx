@@ -20,9 +20,14 @@ export default function ShareCard({
   challengeLink
 }: ShareCardProps) {
   return (
-    <div id="share-card-container" className="w-[1080px] h-[1920px] relative overflow-hidden bg-black font-sans select-none">
-      {/* Background Geometric Effect */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-900 via-black to-black opacity-80"></div>
+    <div id="share-card-container" className="w-[1080px] h-[1920px] relative overflow-hidden bg-black font-sans select-none z-0">
+      {/* Absolute Background Image */}
+      <img 
+        src="/bg_pattern.jpg" 
+        alt="background" 
+        className="absolute inset-0 w-full h-full object-cover opacity-60 -z-10" 
+        crossOrigin="anonymous" 
+      />
       
       {/* Custom Geometric Slash Lines (Overlay) */}
       <div className="absolute inset-0 opacity-20 pointer-events-none">
@@ -42,7 +47,12 @@ export default function ShareCard({
 
       {/* Logo */}
       <div className="absolute top-24 right-16 z-10">
-        <img src="/logo_nobg.png" alt="Mog Logo" className="h-24 object-contain brightness-0 invert" />
+        <img 
+          src="/logo_nobg.png" 
+          alt="Mog Logo" 
+          className="h-24 object-contain" 
+          crossOrigin="anonymous" 
+        />
       </div>
 
       {/* Main Statement */}
