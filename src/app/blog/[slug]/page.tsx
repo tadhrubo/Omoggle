@@ -7,9 +7,10 @@ export async function generateStaticParams() {
   return getAllBlogs().map((post) => ({ slug: post.slug }));
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }) {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
   try {
-    const { meta } = getPostBySlug(params.slug);
+    const { meta } = getPostBySlug(slug);
     return {
       title: `${meta.title} | Omoggle`,
       description: meta.description,
@@ -25,15 +26,25 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   }
 }
 
-export default function BlogPost({ params }: { params: { slug: string } }) {
+export default async function BlogPost({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  let post;
+  
   try {
-    const { content, meta } = getPostBySlug(params.slug);
-    const publishedDate = meta.publishedAt
-      ? new Date(meta.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-      : '';
+    post = getPostBySlug(slug);
+  } catch (err) {
+    console.error(`Error fetching blog post with slug "${slug}":`, err);
+    notFound();
+  }
 
-    return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#09090b', color: 'white' }}>
+  const { content, meta } = post;
+  const publishedDate = meta.publishedAt
+    ? new Date(meta.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    : '';
+
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#09090b', color: 'white' }}>
+      {/* ... rest of the component ... */}
 
         {/* ── Topbar ── */}
         <nav style={{ borderBottom: '1px solid #18181b', padding: '0 24px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, backgroundColor: 'rgba(9,9,11,0.92)', backdropFilter: 'blur(8px)' }}>
@@ -118,7 +129,4 @@ export default function BlogPost({ params }: { params: { slug: string } }) {
         `}</style>
       </div>
     );
-  } catch {
-    notFound();
-  }
 }
