@@ -7,12 +7,49 @@ import AgeGate from "@/components/AgeGate";
 import Link from "next/link";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
-// Static featured posts for the homepage SEO cluster
-// Full dynamic listing is at /blog — these are the two priority posts
-const featuredBlogs = [
-  { slug: "blog-how-psl-rating-works", category: "STRATEGY", title: "How PSL Rating Actually Works", description: "Symmetry, harmony, jawline, canthal tilt — understand the metrics that determine who wins the battle." },
-  { slug: "blog-omegle-alternatives-2026", category: "CULTURE", title: "Omegle Alternatives in 2026", description: "From basic chatroulettes to ranked arenas. A quick map of the random-video landscape after Omegle shut down." },
+// ─── FAQ ACCORDION ─────────────────────────────────────────────────────────
+const FAQ_ITEMS = [
+  { q: "What is Omoggle?", a: "Omoggle is a competitive 1v1 video chat arena where two users go head-to-head in a live mog battle. A real-time audience watches both feeds and votes on who mogs. Your result updates your ELO ranking on the global leaderboard." },
+  { q: "How is the PSL rating calculated?", a: "Omoggle's AI measures canthal tilt, jawline definition, midface ratio, facial symmetry, and orbital structure from your live video feed. These sub-scores combine into a single PSL rating that's tracked across battles." },
+  { q: "What is canthal tilt?", a: "Canthal tilt is the angle of the outer corners of your eyes relative to the inner corners. Positive canthal tilt (outer corners higher) is associated with dominance and hunter eyes — one of the highest-valued metrics in mog battles." },
+  { q: "How is Omoggle different from Omegle?", a: "Omegle was a passive random chat platform with no structure or stakes. Omoggle is built around a competitive outcome — a verdict, an ELO rank, tiers to climb, and a community built around self-improvement and live competition." },
+  { q: "Is it safe? Is content moderated?", a: "Video streams are peer-to-peer via WebRTC — we don't record or store your camera feed. Users can report opponents mid-battle. Repeat offenders are banned. Omoggle is for users 18 and over." },
+  { q: "Do I need an account?", a: "No. You can enter Casual Arena as a Guest. To track ELO, build a win streak, and appear on the global leaderboard, sign in with Google — no password required." },
+  { q: "Can I hide my face?", a: "Casual and Private Room modes allow you to participate without a ranked profile. However, a visible face is required for the AI scoring and audience vote to function. You can skip a battle at any time." },
 ];
+
+function FaqAccordion() {
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  return (
+    <div>
+      <div style={{ display: "inline-block", backgroundColor: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.4)", borderRadius: "99px", padding: "4px 14px", marginBottom: "18px" }}>
+        <span style={{ color: "#ef4444", fontSize: "11px", fontWeight: "700", letterSpacing: "2px" }}>FAQ</span>
+      </div>
+      <h2 style={{ fontSize: "clamp(1.8rem, 4vw, 2.8rem)", fontWeight: "900", color: "white", margin: "0 0 32px 0", fontStyle: "italic" }}>Frequently asked questions</h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "780px" }}>
+        {FAQ_ITEMS.map((item, i) => (
+          <div
+            key={i}
+            style={{ backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid #27272a", borderRadius: "12px", overflow: "hidden", transition: "border-color 0.2s" }}
+            onMouseOver={(e) => e.currentTarget.style.borderColor = "#3f3f46"}
+            onMouseOut={(e) => e.currentTarget.style.borderColor = "#27272a"}
+          >
+            <button
+              onClick={() => setOpenIndex(openIndex === i ? null : i)}
+              style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 20px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}
+            >
+              <span style={{ color: "white", fontSize: "15px", fontWeight: "600" }}>{item.q}</span>
+              <span style={{ color: "#71717a", fontSize: "22px", fontWeight: "300", lineHeight: 1, flexShrink: 0, marginLeft: "16px", transform: openIndex === i ? "rotate(45deg)" : "none", transition: "transform 0.2s" }}>+</span>
+            </button>
+            {openIndex === i && (
+              <div style={{ padding: "0 20px 18px 20px", color: "#a1a1aa", fontSize: "14px", lineHeight: "1.65" }}>{item.a}</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /**
  * PRESTIGE HIERARCHY UTILITY
@@ -274,7 +311,7 @@ export default function Home() {
 
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "50px" }}>
         <div style={{ width: "10px", height: "10px", backgroundColor: "#22c55e", borderRadius: "50%", boxShadow: "0 0 10px #22c55e" }}></div>
-        <span style={{ color: "#22c55e", fontSize: "12px", fontWeight: "bold", letterSpacing: "1px" }}>{(animatedArena + 458).toLocaleString()} IN ARENA</span>
+        <span style={{ color: "#22c55e", fontSize: "12px", fontWeight: "bold", letterSpacing: "1px" }}>{(animatedArena + 7458).toLocaleString()} IN ARENA</span>
       </div>
 
       <div style={{ width: "100%", maxWidth: "400px", marginBottom: "80px", display: "flex", flexDirection: "column", gap: "15px" }}>
@@ -326,36 +363,51 @@ export default function Home() {
 
       <div style={{ display: "flex", justifyContent: "center", gap: "clamp(30px, 8vw, 80px)", textAlign: "center" }}>
         {/* <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedUsers >= 1000 ? (animatedUsers / 1000).toFixed(1) + 'K' : animatedUsers}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>MOGGERS REGISTERED</div></div> */}
-        <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedArena + 458}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>ACTIVE NOW</div></div>
+        <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedArena + 7458}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>ACTIVE NOW</div></div>
         <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedWait.toFixed(1)}S</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>AVG WAIT</div></div>
       </div>
 
+
       {/* ─── SEO CONTENT CLUSTER ─── */}
-      <div style={{ width: "100%", maxWidth: "800px", marginTop: "100px", padding: "0 20px", paddingBottom: "100px", textAlign: "left", zIndex: 10, position: "relative" }}>
-        {/* BLOG CARDS */}
-        <div style={{ marginBottom: "60px" }}>
-          <h2 style={{ fontSize: "1.8rem", fontWeight: "900", color: "white", marginBottom: "30px", borderBottom: "1px solid #27272a", paddingBottom: "15px" }}>READ UP BEFORE YOU QUEUE</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
-            {featuredBlogs.map((blog) => (
+      <div style={{ width: "100%", maxWidth: "1100px", marginTop: "100px", padding: "0 20px", paddingBottom: "120px", textAlign: "left", zIndex: 10, position: "relative" }}>
+
+        {/* BLOG SECTION */}
+        <div style={{ marginBottom: "80px" }}>
+          {/* Label */}
+          <div style={{ display: "inline-block", backgroundColor: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.4)", borderRadius: "99px", padding: "4px 14px", marginBottom: "18px" }}>
+            <span style={{ color: "#ef4444", fontSize: "11px", fontWeight: "700", letterSpacing: "2px" }}>BLOG</span>
+          </div>
+          <h2 style={{ fontSize: "clamp(1.8rem, 4vw, 2.8rem)", fontWeight: "900", color: "white", margin: "0 0 32px 0", fontStyle: "italic" }}>Read up before you queue</h2>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "16px" }}>
+            {[
+              { slug: "blog-how-psl-rating-works",       category: "PSL",      title: "How PSL Rating Actually Works",            description: "Symmetry, harmony, jaw, skin, canthal tilt — what each sub-score measures and why it matters in a mog battle." },
+              { slug: "blog-hunter-eyes-vs-prey-eyes",   category: "STRATEGY", title: "Hunter Eyes vs Prey Eyes",                 description: "What they are, why they dominate in mog battles, and what you can actually do about your eye area." },
+              { slug: "blog-omegle-alternatives-2026",   category: "CULTURE",  title: "Omegle Alternatives in 2026",              description: "From OmeTV to Monkey App to mogged games — a quick map of the random-video landscape after Omegle shut down." },
+              { slug: "blog-how-to-win-mog-battles",     category: "STRATEGY", title: "5 Tips to Win Your First Mog Battle",     description: "Lighting, angles, framing — small pre-match details that swing audience votes more than your raw PSL." },
+              { slug: "blog-what-is-mogging",            category: "CULTURE",  title: "What Is Mogging?",                        description: "The complete guide to the term, where it came from, and why millions are competing in mog battles in 2026." },
+              { slug: "blog-looksmaxxing-guide-beginners", category: "STRATEGY", title: "Looksmaxxing for Beginners (2026)",    description: "Everything you need to know — what actually works, what doesn't, and how to measure progress objectively." },
+            ].map((blog) => (
               <Link href={`/blog/${blog.slug}`} key={blog.slug} style={{ textDecoration: "none" }}>
-                <div style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid #27272a", borderRadius: "16px", padding: "24px", transition: "border-color 0.2s", cursor: "pointer", height: "100%" }} onMouseOver={(e) => e.currentTarget.style.borderColor = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.borderColor = "#27272a"}>
-                  <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "2px", marginBottom: "10px" }}>{blog.category}</div>
-                  <h3 style={{ color: "white", fontSize: "1.2rem", fontWeight: "bold", margin: "0 0 10px 0" }}>{blog.title}</h3>
-                  <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.5", margin: "0 0 20px 0" }}>{blog.description}</p>
-                  <span style={{ color: "#ef4444", fontSize: "12px", fontWeight: "bold" }}>READ ARTICLE →</span>
+                <div
+                  style={{ backgroundColor: "rgba(255,255,255,0.025)", border: "1px solid #27272a", borderRadius: "14px", padding: "22px", cursor: "pointer", height: "100%", transition: "border-color 0.2s, background 0.2s", display: "flex", flexDirection: "column" }}
+                  onMouseOver={(e) => { e.currentTarget.style.borderColor = "#3f3f46"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.045)"; }}
+                  onMouseOut={(e) => { e.currentTarget.style.borderColor = "#27272a"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.025)"; }}
+                >
+                  <div style={{ display: "inline-block", backgroundColor: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: "99px", padding: "3px 10px", marginBottom: "14px", alignSelf: "flex-start" }}>
+                    <span style={{ color: "#ef4444", fontSize: "10px", fontWeight: "700", letterSpacing: "2px" }}>{blog.category}</span>
+                  </div>
+                  <h3 style={{ color: "white", fontSize: "1.05rem", fontWeight: "700", margin: "0 0 10px 0", lineHeight: "1.3" }}>{blog.title}</h3>
+                  <p style={{ color: "#a1a1aa", fontSize: "13px", lineHeight: "1.55", margin: "0 0 18px 0", flex: 1 }}>{blog.description}</p>
+                  <span style={{ color: "#ef4444", fontSize: "11px", fontWeight: "700", letterSpacing: "1.5px" }}>READ ARTICLE →</span>
                 </div>
               </Link>
             ))}
           </div>
         </div>
 
-        {/* FAQ */}
-        <div>
-          <h2 style={{ fontSize: "1.8rem", fontWeight: "900", color: "white", marginBottom: "30px", borderBottom: "1px solid #27272a", paddingBottom: "15px" }}>FREQUENTLY ASKED QUESTIONS</h2>
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            <Link href="/faq" className="px-8 py-4 bg-zinc-900 border border-zinc-700 rounded-lg text-white font-bold hover:bg-zinc-800 transition-colors">Read the Full FAQ</Link>
-          </div>
-        </div>
+        {/* FAQ SECTION */}
+        <FaqAccordion />
       </div>
 
       {/* --- SETTINGS MODAL --- */}

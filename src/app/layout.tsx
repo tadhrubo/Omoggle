@@ -109,17 +109,22 @@ export const metadata: Metadata = {
   },
 
   // ── Icons ─────────────────────────────────────────────────────────────────
+  // Next.js serves src/app/icon.png as /icon.png automatically (192x192).
+  // The explicit list below ensures Google, browsers, and PWA all pick the right size.
   icons: {
+    // Primary favicon — shown on browser tabs
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
-      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/android-chrome-192x192.png", sizes: "192x192", type: "image/png" }, // Google Search Target
+      { url: "/favicon.ico",             sizes: "any",    type: "image/x-icon" },
+      { url: "/favicon-16x16.png",       sizes: "16x16",  type: "image/png" },
+      { url: "/favicon-32x32.png",       sizes: "32x32",  type: "image/png" },
+      // Google Search uses the 192x192 icon for the site favicon in SERP results
+      { url: "/android-chrome-192x192.png", sizes: "192x192", type: "image/png" },
       { url: "/android-chrome-512x512.png", sizes: "512x512", type: "image/png" },
     ],
-    apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
-    ],
+    // Shortcut icon — explicitly tells crawlers (including Googlebot) which icon to use
+    shortcut: [{ url: "/android-chrome-192x192.png", type: "image/png" }],
+    // Apple touch icon — iOS home screen
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   manifest: "/manifest.json",
   category: "games",
