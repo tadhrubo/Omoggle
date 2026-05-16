@@ -26,6 +26,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   }
 }
 
+const mdxComponents = {
+  ArenaCTA: () => (
+    <div style={{ margin: '48px 0', padding: '32px', background: 'linear-gradient(180deg, #18181b 0%, #09090b 100%)', border: '2px solid #27272a', borderRadius: '16px', textAlign: 'center', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)' }}>
+      <h3 style={{ fontSize: '1.875rem', fontWeight: '900', fontStyle: 'italic', color: 'white', letterSpacing: '-0.025em', marginBottom: '8px', textTransform: 'uppercase' }}>Ready to Face the Scanner?</h3>
+      <p style={{ color: '#71717a', marginBottom: '24px', fontSize: '1.125rem' }}>Stop reading theory. Test your presentation in the live arena and see how the audience votes.</p>
+      <a href="/arena/casual" style={{ display: 'inline-block', padding: '16px 40px', backgroundColor: 'white', color: 'black', fontWeight: '900', letterSpacing: '0.1em', borderRadius: '9999px', textTransform: 'uppercase', transition: 'all 0.2s' }}>Enter the Arena</a>
+    </div>
+  ),
+};
+
 export default async function BlogPost({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   let post;
@@ -42,9 +52,47 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
     ? new Date(meta.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     : '';
 
+  const wordCount = content.split(/\s+/g).length;
+  const readingTime = Math.ceil(wordCount / 200);
+
+  const allPosts = getAllBlogs();
+  const relatedPosts = allPosts.filter(p => p.slug !== slug).slice(0, 2);
+
+  const baseUrl = 'https://omoggle.games';
+
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": baseUrl },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": `${baseUrl}/blog` },
+        { "@type": "ListItem", "position": 3, "name": meta.title, "item": `${baseUrl}/blog/${slug}` }
+      ]
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": meta.title,
+      "description": meta.description,
+      "datePublished": meta.publishedAt,
+      "dateModified": meta.publishedAt,
+      "author": { "@type": "Organization", "name": "Omoggle" },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Omoggle",
+        "logo": { "@type": "ImageObject", "url": `${baseUrl}/icon.png` }
+      },
+      "mainEntityOfPage": `${baseUrl}/blog/${slug}`
+    }
+  ];
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#09090b', color: 'white' }}>
-      {/* ... rest of the component ... */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
         {/* ── Topbar ── */}
         <nav style={{ borderBottom: '1px solid #18181b', padding: '0 24px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 50, backgroundColor: 'rgba(9,9,11,0.92)', backdropFilter: 'blur(8px)' }}>
@@ -80,6 +128,8 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingBottom: '32px', borderBottom: '1px solid #18181b' }}>
             {publishedDate && <span style={{ color: '#52525b', fontSize: '13px', fontFamily: 'monospace' }}>{publishedDate}</span>}
             <span style={{ color: '#3f3f46', fontSize: '13px' }}>·</span>
+            <span style={{ color: '#52525b', fontSize: '13px', fontFamily: 'monospace' }}>{readingTime} MIN READ</span>
+            <span style={{ color: '#3f3f46', fontSize: '13px' }}>·</span>
             <span style={{ color: '#52525b', fontSize: '13px', fontFamily: 'monospace' }}>OMOGGLE EDITORIAL</span>
           </div>
         </header>
@@ -87,7 +137,7 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
         {/* ── Body ── */}
         <main style={{ maxWidth: '760px', margin: '0 auto', padding: '0 24px 100px' }}>
           <div className="blog-prose">
-            <MDXRemote source={content} />
+            <MDXRemote source={content} components={mdxComponents} />
           </div>
         </main>
 
@@ -102,6 +152,21 @@ export default async function BlogPost({ params }: { params: Promise<{ slug: str
             </div>
           </div>
         </div>
+
+        {/* ── Related Articles ── */}
+        {relatedPosts.length > 0 && (
+          <div style={{ maxWidth: '760px', margin: '0 auto', padding: '60px 24px', borderTop: '1px solid #18181b' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#71717a' }}>Keep Reading</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+              {relatedPosts.map((post) => (
+                <Link href={`/blog/${post.slug}`} key={post.slug} style={{ textDecoration: 'none', padding: '24px', border: '1px solid #27272a', borderRadius: '12px', transition: 'background-color 0.2s' }}>
+                  <h4 style={{ fontSize: '1.125rem', fontWeight: '700', color: 'white', marginBottom: '8px' }}>{post.meta.title}</h4>
+                  <p style={{ fontSize: '0.875rem', color: '#71717a', lineHeight: '1.5', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{post.meta.description}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Global prose styles ── */}
         <style>{`
