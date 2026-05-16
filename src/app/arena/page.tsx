@@ -6,6 +6,7 @@ import { useFaceScanner } from "@/hooks/useFaceScanner";
 import { calculateMogScore } from "@/utils/faceMath";
 import { calculateEloUpdate } from "@/utils/eloMath";
 import { createClient } from "@/lib/supabase/client";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const SLEEK_INDICES = [10, 152, 234, 454, 132, 361, 33, 263, 4, 61, 291];
 
@@ -60,6 +61,7 @@ const getMatchVerdict = (myScore: number, oppScore: number) => {
 function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localProfile: any }) {
   const router = useRouter();
   const supabase = createClient();
+  const { trackEvent } = useAnalytics();
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -103,6 +105,7 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
       sendTelemetry("PROFILE_SYNC", { profile: localProfile });
       setBattlePhase("connected");
       setCountdown(5);
+      trackEvent("battle_join");
       setTimeout(() => setBattlePhase("countdown"), 1000);
     }
   }, [isConnected, battlePhase, sendTelemetry, localProfile]);
@@ -171,6 +174,7 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
                     setMyScore(currentScore);
                     sendTelemetry("FINAL_SCORE", { score: currentScore });
                     setBattlePhase("result");
+                    trackEvent("battle_complete");
 
                     // Play victory/defeat sound
                     const isWinner = currentScore > (opponentScore || 0);

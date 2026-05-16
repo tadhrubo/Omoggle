@@ -5,6 +5,7 @@ import { usePrivateRoom } from "@/hooks/usePrivateRoom";
 import { useFaceScanner } from "@/hooks/useFaceScanner";
 import { calculateMogScore } from "@/utils/faceMath";
 import { createClient } from "@/lib/supabase/client";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const SLEEK_INDICES = [10, 152, 234, 454, 132, 361, 33, 263, 4, 61, 291];
 
@@ -86,6 +87,7 @@ const getMatchVerdict = (localScore: number, remoteScore: number) => {
 // ============================================================================
 function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localProfile: any }) {
   const router = useRouter();
+  const { trackEvent } = useAnalytics();
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const localCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -135,6 +137,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
       sendTelemetry("PROFILE_SYNC", { profile: localProfile });
       setPhase('PREP');
       setTimer(5);
+      trackEvent("battle_join");
     }
   }, [isConnected, phase, sendTelemetry, localProfile]);
 
@@ -266,6 +269,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
       setPhase("RESULT");
       const isWinner = myScore > opponentScore;
       playResultSound(isWinner);
+      trackEvent("battle_complete");
     }
   }, [myScore, opponentScore]);
 

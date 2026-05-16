@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Swords, LogOut, User, X, Settings } from "lucide-react";
 import AgeGate from "@/components/AgeGate";
 import Link from "next/link";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 /**
  * PRESTIGE HIERARCHY UTILITY
@@ -39,6 +40,11 @@ function useAnimatedNumber(end: number, duration: number = 2000) {
 
 export default function Home() {
   const router = useRouter();
+  const { trackEvent } = useAnalytics();
+
+  useEffect(() => {
+    trackEvent("session_start");
+  }, [trackEvent]);
   
   // ARCHITECT FIX: Stabilize the Supabase client so it doesn't re-create on every keystroke
   const [supabase] = useState(() => createClient());
