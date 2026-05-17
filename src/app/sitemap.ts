@@ -11,6 +11,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: '/arena/ranked', priority: 0.9, changeFrequency: 'daily' as const },
     { url: '/blog', priority: 0.8, changeFrequency: 'daily' as const },
     { url: '/faq', priority: 0.8, changeFrequency: 'weekly' as const },
+    { url: '/app', priority: 0.8, changeFrequency: 'weekly' as const },
+    { url: '/ranks', priority: 0.8, changeFrequency: 'weekly' as const },
   ].map((route) => ({
     url: `${BASE_URL}${route.url}`,
     lastModified: new Date(),
