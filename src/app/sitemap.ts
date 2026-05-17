@@ -1,52 +1,32 @@
-/*import { MetadataRoute } from 'next'
- 
-export default function sitemap(): MetadataRoute.Sitemap {
-  return [
-    {
-      url: 'https://omoggle.games',
-      lastModified: new Date(),
-      changeFrequency: 'always',
-      priority: 1.0,
-    },
-    {
-      url: 'https://omoggle.games/arena/casual',
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.8,
-    },
-    {
-      url: 'https://omoggle.games/arena/ranked',
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
-  ]
-}
-
-
-*/
-
-// app/sitemap.ts
-import { MetadataRoute } from 'next'
+import { MetadataRoute } from 'next';
+import { getAllBlogs } from '@/lib/mdx';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const blogSlugs = [
-    'what-is-mogging',
-    'omegle-alternatives-2026',
-    'how-psl-rating-works',
-    'looksmaxxing-guide-beginners',
-    'hunter-eyes-vs-prey-eyes',
-    'how-to-win-mog-battles',
-  ]
+  const BASE_URL = 'https://omoggle.games';
 
-  return [
-    { url: 'https://omoggle.games', lastModified: new Date(), changeFrequency: 'daily', priority: 1 },
-    { url: 'https://omoggle.games/faq', lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
-    ...blogSlugs.map(slug => ({
-      url: `https://omoggle.games/blog/${slug}`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly' as const,
-      priority: 0.7,
-    })),
-  ]
+  // 1. Core Static Routes
+  const staticRoutes = [
+    { url: '', priority: 1.0, changeFrequency: 'always' as const },
+    { url: '/arena/casual', priority: 0.9, changeFrequency: 'daily' as const },
+    { url: '/arena/ranked', priority: 0.9, changeFrequency: 'daily' as const },
+    { url: '/blog', priority: 0.8, changeFrequency: 'daily' as const },
+    { url: '/faq', priority: 0.8, changeFrequency: 'weekly' as const },
+  ].map((route) => ({
+    url: `${BASE_URL}${route.url}`,
+    lastModified: new Date(),
+    changeFrequency: route.changeFrequency,
+    priority: route.priority,
+  }));
+
+  // 2. Dynamic Blog Routes
+  const posts = getAllBlogs();
+  const dynamicRoutes = posts.map((post) => ({
+    url: `${BASE_URL}/blog/${post.slug}`,
+    lastModified: new Date(post.meta.publishedAt || new Date()),
+    changeFrequency: 'monthly' as const,
+    priority: 0.7,
+  }));
+
+  // 3. Combine and Return
+  return [...staticRoutes, ...dynamicRoutes];
 }
