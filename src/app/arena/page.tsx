@@ -76,7 +76,7 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
 
   // 2. PASS DYNAMIC PROFILE & MODE INTO MATCHMAKER
   const { 
-    localStream, remoteStream, isSearching, isConnected, 
+    localStream, remoteStream, isSearching, isConnected, isConnecting,
     opponentScore, liveOpponentScore, remoteProfile, skip, sendTelemetry 
   } = useMatchmaker({
     mode: mode,
@@ -294,9 +294,11 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
           {isSearching && (
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: mode === "ranked" ? "#fbbf24" : "#ef4444", zIndex: 10 }}>
               <span style={{ fontFamily: "monospace", letterSpacing: "2px", fontWeight: "bold" }}>
-                {mode === "ranked" ? "EXPANDING SEARCH RADIUS..." : "SEARCHING FOR OPPONENT..."}
+                {isConnecting 
+                  ? "CONNECTING TO OPPONENT..." 
+                  : (mode === "ranked" ? "EXPANDING SEARCH RADIUS..." : "SEARCHING FOR OPPONENT...")}
               </span>
-              {mode === "ranked" && <span style={{ fontSize: "10px", color: "#71717a", marginTop: "10px" }}>+/- 50 ELO</span>}
+              {!isConnecting && mode === "ranked" && <span style={{ fontSize: "10px", color: "#71717a", marginTop: "10px" }}>+/- 50 ELO</span>}
             </div>
           )}
           <video ref={remoteVideoRef} autoPlay playsInline style={{ position: "absolute", width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />

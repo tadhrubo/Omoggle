@@ -79,17 +79,30 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect, onRem
 
         // 2. Create PeerJS peer
         const uniqueId = "priv_" + Math.random().toString(36).substr(2, 9);
+
+        const rtcConfig = {
+          iceServers: [
+            // 1. Google's Free STUN (Handles 80% of normal connections)
+            {
+              urls: [
+                'stun:stun.l.google.com:19302',
+                'stun:stun1.l.google.com:19302'
+              ]
+            },
+            // 2. Metered.ca TURN (Fallback for strict firewalls/Symmetric NATs)
+            ...(process.env.NEXT_PUBLIC_TURN_URL && process.env.NEXT_PUBLIC_TURN_USERNAME && process.env.NEXT_PUBLIC_TURN_CREDENTIAL 
+              ? [{
+                  urls: process.env.NEXT_PUBLIC_TURN_URL,
+                  username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+                  credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL
+                }] 
+              : [])
+          ],
+          iceCandidatePoolSize: 10, // Speeds up the connection process
+        };
+
         const peer = new Peer(uniqueId, {
-          config: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' },
-              { urls: 'stun:stun1.l.google.com:19302' },
-              { urls: 'stun:stun2.l.google.com:19302' },
-              { urls: 'stun:stun3.l.google.com:19302' },
-              { urls: 'stun:stun4.l.google.com:19302' },
-              { urls: 'stun:global.stun.twilio.com:3478' }
-            ]
-          }
+          config: rtcConfig
         });
         peerRef.current = peer;
 
