@@ -22,3 +22,17 @@ export function calculateEloUpdate(myElo: number, opponentElo: number, isWinner:
   
   return { newElo, eloChange };
 }
+
+// Custom Prestige Hierarchy Mapping based on ELO
+export function getPrestigeRank(elo: number): string {
+  if (elo >= 2500) return "TRUE ADAM";
+  if (elo >= 2200) return "TERRACHAD";
+  if (elo >= 1900) return "CHAD";
+  if (elo >= 1600) return "CHADLITE";
+  if (elo >= 1300) return "HTN";
+  if (elo >= 1000) return "MTN";
+  if (elo >= 750) return "LTN";
+  if (elo >= 500) return "SUB5";
+  if (elo >= 250) return "NPC";
+  return "DOOMER";
+}

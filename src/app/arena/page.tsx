@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMatchmaker } from "@/hooks/useMatchmaker";
 import { useFaceScanner } from "@/hooks/useFaceScanner";
 import { calculateMogScore } from "@/utils/faceMath";
-import { calculateEloUpdate } from "@/utils/eloMath";
+import { calculateEloUpdate, getPrestigeRank } from "@/utils/eloMath";
 import { createClient } from "@/lib/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
@@ -305,7 +305,7 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
           {remoteProfile && (
             <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
               <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{remoteProfile.name}</div>
-              {mode === "ranked" && <div style={{ color: "#a1a1aa", fontSize: "10px", fontFamily: "monospace" }}>{remoteProfile.tier} • {remoteProfile.elo} ELO</div>}
+              {mode === "ranked" && <div style={{ color: "#a1a1aa", fontSize: "10px", fontFamily: "monospace" }}>{getPrestigeRank(remoteProfile.elo || 1200)} • {remoteProfile.elo || 1200} ELO</div>}
             </div>
           )}
           {liveOpponentScore && battlePhase === "countdown" && (
@@ -319,7 +319,7 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
           <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 2, pointerEvents: "none", transform: "scaleX(-1)" }} />
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
             <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{localProfile.name}</div>
-            {mode === "ranked" && <div style={{ color: "#a1a1aa", fontSize: "10px", fontFamily: "monospace" }}>{localProfile.tier} • {localProfile.elo} ELO</div>}
+            {mode === "ranked" && <div style={{ color: "#a1a1aa", fontSize: "10px", fontFamily: "monospace" }}>{getPrestigeRank(localProfile.elo || 1200)} • {localProfile.elo || 1200} ELO</div>}
           </div>
           {liveMyScore && battlePhase === "countdown" && (
             <div style={{ position: "absolute", bottom: 16, right: 16, zIndex: 20, color: "white", fontWeight: "900", fontSize: "4rem", opacity: 0.8 }}>{liveMyScore.toFixed(1)}</div>
