@@ -32,6 +32,12 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect,
   
   const supabase = createClient();
 
+  // Stabilize callbacks to prevent the main useEffect from rerunning on every render
+  const onRematchRef = useRef(onRematch);
+  useEffect(() => {
+    onRematchRef.current = onRematch;
+  }, [onRematch]);
+
   const sendTelemetry = useCallback((type: string, payload: any) => {
     if (dataConnRef.current?.open) dataConnRef.current.send({ type, ...payload });
   }, []);
@@ -44,8 +50,8 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect,
   const acceptRematch = useCallback(() => {
     sendTelemetry("REMATCH_ACCEPT", {});
     setRematchState('idle');
-    if (onRematch) onRematch();
-  }, [sendTelemetry, onRematch]);
+    if (onRematchRef.current) onRematchRef.current();
+  }, [sendTelemetry]);
 
   const setupDataConnection = useCallback((conn: DataConnection) => {
     dataConnRef.current = conn;
@@ -61,10 +67,10 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect,
       }
       if (data.type === "REMATCH_ACCEPT") {
         setRematchState('idle');
-        if (onRematch) onRematch();
+        if (onRematchRef.current) onRematchRef.current();
       }
     });
-  }, [onRematch]);
+  }, []);
 
   const pollForRankedMatch = async (peer: Peer, stream: MediaStream) => {
     if (!peer.id) return;
@@ -287,7 +293,8 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect,
         peerRef.current.destroy();
       }
     };
-  }, [setupDataConnection, mode, playerElo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, playerElo]);
 
   // NEW: Return isDataConnected & rematch controls
   return { 
