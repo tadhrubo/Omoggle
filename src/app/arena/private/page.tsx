@@ -183,37 +183,12 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const detectRef = useRef(detect);
   useEffect(() => { detectRef.current = detect; }, [detect]);
 
-  // Robust effect to manage local video stream, programmatic play, loop initialization, and unmount cleanup
   useEffect(() => {
-    const video = localVideoRef.current;
-    if (video && localStream) {
-      video.srcObject = localStream;
-      video.play()
-        .then(() => {
-          console.log("Local video started playing successfully.");
-        })
-        .catch(err => {
-          console.warn("Local video play failed or was interrupted:", err);
-        });
-      
-      // Immediately start the animation loop to ensure we catch frame updates
-      handleLocalVideoReady();
-    }
-    
-    return () => {
-      if (requestRef.current) {
-        cancelAnimationFrame(requestRef.current);
-      }
-    };
+    if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream;
   }, [localStream]);
 
-  // Robust effect to manage remote video stream
   useEffect(() => {
-    const video = remoteVideoRef.current;
-    if (video && remoteStream) {
-      video.srcObject = remoteStream;
-      video.play().catch(err => console.warn("Remote video play failed:", err));
-    }
+    if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
   }, [remoteStream]);
 
   // Guarantee that the canvas wipes clean when the match ends or when phase changes
@@ -528,7 +503,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
 
         <div className="video-box" style={{ borderTop: "2px solid #27272a" }}>
           {/* RESTORED: onLoadedData handles initialization safely */}
-          <video ref={localVideoRef} autoPlay playsInline muted className="video-element" style={{ transform: "scaleX(-1)", position: "relative", zIndex: 10 }} />
+          <video ref={localVideoRef} autoPlay playsInline muted onLoadedData={handleLocalVideoReady} className="video-element" style={{ transform: "scaleX(-1)", position: "relative", zIndex: 10 }} />
           <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 15, pointerEvents: "none", transform: "scaleX(-1)" }} />
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
             <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{localProfile.name}</div>
