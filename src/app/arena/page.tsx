@@ -10,7 +10,6 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 
 const SLEEK_INDICES = [10, 152, 234, 454, 132, 361, 33, 263, 4, 61, 291];
 
-// Simple audio synthesis for tick and victory/defeat
 const playTickSound = () => {
   const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
   const osc = ctx.createOscillator();
@@ -56,7 +55,7 @@ const getMatchVerdict = (myScore: number, oppScore: number) => {
 };
 
 // ============================================================================
-// 1. CORE BATTLE COMPONENT (Your exact working code, driven by dynamic props)
+// 1. CORE BATTLE COMPONENT
 // ============================================================================
 function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localProfile: any }) {
   const router = useRouter();
@@ -74,9 +73,9 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
   const [liveMyScore, setLiveMyScore] = useState<number | null>(null);
   const [eloResult, setEloResult] = useState<{ newElo: number, change: number } | null>(null);
 
-  // 2. PASS DYNAMIC PROFILE & MODE INTO MATCHMAKER
+  // NEW: Destructuring isDataConnected
   const { 
-    localStream, remoteStream, isSearching, isConnected, isConnecting,
+    localStream, remoteStream, isSearching, isConnected, isConnecting, isDataConnected,
     opponentScore, liveOpponentScore, remoteProfile, skip, sendTelemetry 
   } = useMatchmaker({
     mode: mode,
@@ -100,15 +99,72 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
     if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
   }, [remoteStream]);
 
+  // FIX 1: Strict Sync - Wait for BOTH video and data channels
   useEffect(() => {
-    if (isConnected && battlePhase === "waiting") {
+    if (isConnected && isDataConnected && battlePhase === "waiting") {
       sendTelemetry("PROFILE_SYNC", { profile: localProfile });
       setBattlePhase("connected");
       setCountdown(5);
       trackEvent("battle_join");
       setTimeout(() => setBattlePhase("countdown"), 1000);
     }
-  }, [isConnected, battlePhase, sendTelemetry, localProfile]);
+  }, [isConnected, isDataConnected, battlePhase, sendTelemetry, localProfile, trackEvent]);
+
+  // FIX 2: Decoupled End Logic - This runs exactly when countdown hits 0
+  useEffect(() => {
+    if (battlePhase === "countdown" && countdown === 0 && myScore === null) {
+      // Fallback to 0 if the scanner failed or they covered the camera
+      const finalScore = liveMyScore !== null ? liveMyScore : 0; 
+      
+      setMyScore(finalScore);
+      sendTelemetry("FINAL_SCORE", { score: finalScore });
+      setBattlePhase("result");
+      trackEvent("battle_complete");
+
+      const isWinner = finalScore > (opponentScore || 0);
+      playResultSound(isWinner);
+      
+      const oppElo = remoteProfile?.elo || 1200;
+      const { newElo, eloChange } = calculateEloUpdate(localProfile.elo, oppElo, isWinner);
+      setEloResult({ newElo, change: eloChange });
+
+      // Save to database logic
+      if (mode === "ranked" && localProfile.id) {
+        supabase.rpc('update_post_match_stats', {
+          p_user_id: localProfile.id,
+          p_new_elo: newElo,
+          p_is_winner: isWinner,
+          p_mode: mode
+        }).then();
+
+        supabase.from('matches').insert([{
+          winner_id: isWinner ? localProfile.id : (remoteProfile?.id || null),
+          loser_id: isWinner ? (remoteProfile?.id || null) : localProfile.id,
+          winner_score: isWinner ? finalScore : (opponentScore || 0),
+          loser_score: isWinner ? (opponentScore || 0) : finalScore,
+          elo_change: Math.abs(eloChange),
+          mode: mode
+        }]).then();
+
+        if (isWinner && remoteProfile?.id && (remoteProfile?.current_streak || 0) >= 5) {
+          supabase.from('nemeses').upsert([{
+            user_id: remoteProfile.id,
+            nemesis_id: localProfile.id,
+            reason: 'streak_breaker'
+          }], { onConflict: 'user_id,nemesis_id' }).then();
+        }
+
+        if (remoteProfile?.id) {
+          supabase.rpc('update_post_match_stats', {
+            p_user_id: remoteProfile.id,
+            p_new_elo: calculateEloUpdate(oppElo, localProfile.elo, !isWinner).newElo,
+            p_is_winner: !isWinner,
+            p_mode: mode
+          }).then();
+        }
+      }
+    }
+  }, [countdown, battlePhase, myScore, liveMyScore, opponentScore, mode, localProfile, remoteProfile, supabase, trackEvent]);
 
   const handleLocalVideoReady = () => {
     const loop = () => {
@@ -163,66 +219,11 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
                   const rawScore = calculateMogScore(result.faceLandmarks[0] as any);
                   const currentScore = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0;
 
+                  // FIX 3: Removed end-game logic, only telemetry remains here
                   if (timeMs - lastTelemetryTime.current > 150) {
                     setLiveMyScore(currentScore); 
                     sendTelemetry("LIVE_SCORE", { score: currentScore });
                     lastTelemetryTime.current = timeMs;
-                  }
-                  
-                  // 3. MATCH END LOGIC
-                  if (countdown === 0 && myScore === null) {
-                    setMyScore(currentScore);
-                    sendTelemetry("FINAL_SCORE", { score: currentScore });
-                    setBattlePhase("result");
-                    trackEvent("battle_complete");
-
-                    // Play victory/defeat sound
-                    const isWinner = currentScore > (opponentScore || 0);
-                    playResultSound(isWinner);
-                    const oppElo = remoteProfile?.elo || 1200;
-                    const { newElo, eloChange } = calculateEloUpdate(localProfile.elo, oppElo, isWinner);
-                    
-                    setEloResult({ newElo, change: eloChange });
-
-                    // Persist: Stats + Match Record (Ranked + Authenticated only)
-                    if (mode === "ranked" && localProfile.id) {
-                      // Atomic stats update via RPC
-                      supabase.rpc('update_post_match_stats', {
-                        p_user_id: localProfile.id,
-                        p_new_elo: newElo,
-                        p_is_winner: isWinner,
-                        p_mode: mode
-                      }).then(() => console.log("Stats updated."));
-
-                      // Save match to history
-                      supabase.from('matches').insert([{
-                        winner_id: isWinner ? localProfile.id : (remoteProfile?.id || null),
-                        loser_id: isWinner ? (remoteProfile?.id || null) : localProfile.id,
-                        winner_score: isWinner ? currentScore : (opponentScore || 0),
-                        loser_score: isWinner ? (opponentScore || 0) : currentScore,
-                        elo_change: Math.abs(eloChange),
-                        mode: mode
-                      }]).then(() => console.log("Match record saved."));
-
-                      // Nemesis detection: if we broke opponent's 5+ streak
-                      if (isWinner && remoteProfile?.id && (remoteProfile?.current_streak || 0) >= 5) {
-                        supabase.from('nemeses').upsert([{
-                          user_id: remoteProfile.id,
-                          nemesis_id: localProfile.id,
-                          reason: 'streak_breaker'
-                        }], { onConflict: 'user_id,nemesis_id' }).then(() => console.log("Nemesis tagged."));
-                      }
-
-                      // Also update opponent stats if they're authenticated
-                      if (remoteProfile?.id) {
-                        supabase.rpc('update_post_match_stats', {
-                          p_user_id: remoteProfile.id,
-                          p_new_elo: calculateEloUpdate(oppElo, localProfile.elo, !isWinner).newElo,
-                          p_is_winner: !isWinner,
-                          p_mode: mode
-                        }).then();
-                      }
-                    }
                   }
                 }
               }
@@ -350,7 +351,7 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
 }
 
 // ============================================================================
-// 2. DATA LOADER (Guarantees profile resolves BEFORE WebRTC hooks fire)
+// 2. DATA LOADER
 // ============================================================================
 function ArenaDataLoader() {
   const searchParams = useSearchParams();
@@ -380,7 +381,6 @@ function ArenaDataLoader() {
             });
           }
         } else {
-          // NEW: Unauthenticated Guest logic reads from localStorage!
           if (isMounted) {
             const savedGuestName = localStorage.getItem("omoggle_guest_name");
             setLocalProfile({
@@ -423,7 +423,7 @@ function ArenaDataLoader() {
 }
 
 // ============================================================================
-// 3. SAFE SUSPENSE WRAPPER (Prevents Next.js crash loops)
+// 3. SAFE SUSPENSE WRAPPER
 // ============================================================================
 export default function Arena() {
   return (

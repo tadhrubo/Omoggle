@@ -15,6 +15,8 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
   const [isSearching, setIsSearching] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  // NEW: State to track if the invisible data pipe is actually open
+  const [isDataConnected, setIsDataConnected] = useState(false);
   const [opponentScore, setOpponentScore] = useState<number | null>(null);
   const [liveOpponentScore, setLiveOpponentScore] = useState<number | null>(null);
   const [remoteProfile, setRemoteProfile] = useState<any>(null);
@@ -24,14 +26,14 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
   const dataConnRef = useRef<DataConnection | null>(null);
   const searchRadius = useRef<number>(50); 
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // NEW: Keep a hard reference to the camera stream to kill it on unmount
   const streamRef = useRef<MediaStream | null>(null); 
   
   const supabase = createClient();
 
   const setupDataConnection = useCallback((conn: DataConnection) => {
     dataConnRef.current = conn;
+    // NEW: Listen for the open event before sending data
+    conn.on("open", () => setIsDataConnected(true));
     conn.on("data", (data: any) => {
       if (!data || !data.type) return;
       if (data.type === "PROFILE_SYNC") setRemoteProfile(data.profile);
@@ -60,7 +62,6 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
       
       setIsConnecting(true);
 
-      // Call the secure RPC function to claim the match atomically
       const { data: matchClaimed, error } = await supabase.rpc('claim_match', {
         p_queue_table: 'ranked_queue',
         p_opponent_peer_id: opponentId,
@@ -79,13 +80,11 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
         const call = peer.call(opponentId, stream);
         callRef.current = call;
         
-        // Timeout check: if remote stream doesn't arrive within 10 seconds, reset connection
         const connectionTimeout = setTimeout(() => {
           if (callRef.current === call) {
             console.warn("Ranked handshake timed out. Recovering...");
             setIsConnecting(false);
             call.close();
-            // Re-insert ourselves and start polling again
             supabase.from("ranked_queue").insert([{ peer_id: peer.id, elo: playerElo }]).then();
             pollIntervalRef.current = setInterval(() => {
               pollForRankedMatch(peer, stream);
@@ -99,14 +98,12 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
           setIsConnected(true);
           setIsConnecting(false);
           setIsSearching(false);
-          // Haptic feedback on connection
           if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         });
 
         const conn = peer.connect(opponentId);
         setupDataConnection(conn);
       } else {
-        // Opponent already claimed by someone else, reset connecting state
         setIsConnecting(false);
       }
     } else {
@@ -137,7 +134,6 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
         
         setIsConnecting(true);
 
-        // Call the secure RPC function to claim the match atomically
         const { data: matchClaimed, error } = await supabase.rpc('claim_match', {
           p_queue_table: 'arena_queue',
           p_opponent_peer_id: opponentId,
@@ -154,13 +150,11 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
           const call = peer.call(opponentId, stream);
           callRef.current = call;
 
-          // Timeout check: if remote stream doesn't arrive within 10 seconds, reset connection
           const connectionTimeout = setTimeout(() => {
             if (callRef.current === call) {
               console.warn("Casual handshake timed out. Recovering...");
               setIsConnecting(false);
               call.close();
-              // Re-insert myself to queue
               supabase.from("arena_queue").insert([{ peer_id: peer.id }]).then();
             }
           }, 10000);
@@ -176,7 +170,6 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
           const conn = peer.connect(opponentId);
           setupDataConnection(conn);
         } else {
-          // Opponent was already claimed, reset connecting and add myself to queue instead
           setIsConnecting(false);
           await supabase.from("arena_queue").insert([{ peer_id: peer.id }]);
         }
@@ -192,27 +185,24 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         
-        // Edge case: If user clicks "Back" before the camera even turns on
         if (!isMounted) {
           stream.getTracks().forEach(track => track.stop());
           return;
         }
 
         setLocalStream(stream);
-        streamRef.current = stream; // Save to ref for cleanup
+        streamRef.current = stream; 
 
         const uniqueId = "user_" + Math.random().toString(36).substr(2, 9);
 
         const rtcConfig = {
           iceServers: [
-            // 1. Google's Free STUN (Handles 80% of normal connections)
             {
               urls: [
                 'stun:stun.l.google.com:19302',
                 'stun:stun1.l.google.com:19302'
               ]
             },
-            // 2. Metered.ca TURN (Fallback for strict firewalls/Symmetric NATs)
             ...(process.env.NEXT_PUBLIC_TURN_URL && process.env.NEXT_PUBLIC_TURN_USERNAME && process.env.NEXT_PUBLIC_TURN_CREDENTIAL 
               ? [{
                   urls: process.env.NEXT_PUBLIC_TURN_URL,
@@ -221,7 +211,7 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
                 }] 
               : [])
           ],
-          iceCandidatePoolSize: 10, // Speeds up the connection process
+          iceCandidatePoolSize: 10,
         };
 
         const peer = new Peer(uniqueId, {
@@ -256,21 +246,17 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
 
     init();
     
-    // COMPLETE TEARDOWN ON UNMOUNT
     return () => { 
       isMounted = false;
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       
-      // 1. Kill the Camera Hardware
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
 
-      // 2. Kill the Peer Connection & Queue
       if (peerRef.current) {
         const id = peerRef.current.id;
         if (id) {
-          // Fire and forget deletes
           supabase.from("arena_queue").delete().eq("peer_id", id).then();
           supabase.from("ranked_queue").delete().eq("peer_id", id).then();
         }
@@ -283,5 +269,6 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect 
     if (dataConnRef.current?.open) dataConnRef.current.send({ type, ...payload });
   };
 
-  return { localStream, remoteStream, isSearching, isConnected, isConnecting, opponentScore, liveOpponentScore, remoteProfile, sendTelemetry, skip: () => window.location.reload() };
+  // NEW: Return isDataConnected
+  return { localStream, remoteStream, isSearching, isConnected, isConnecting, isDataConnected, opponentScore, liveOpponentScore, remoteProfile, sendTelemetry, skip: () => window.location.reload() };
 }
