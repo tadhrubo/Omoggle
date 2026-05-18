@@ -94,17 +94,14 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const lastTelemetryTime = useRef(0);
   const scoreHistoryRef = useRef<number[]>([]);
   const cardRef = useRef<HTMLDivElement>(null);
-  const [preloadedShareFile, setPreloadedShareFile] = useState<File | null>(null);
-  const [isPreloading, setIsPreloading] = useState(false);
+  
+  // FIX 3: Replaced the broken background loader with a simple, on-demand loading state
+  const [isSharing, setIsSharing] = useState(false);
 
   const handleDownloadCard = async () => {
     if (!cardRef.current) return;
     try {
-      // FIX: Add watchdog to foreground download as well
-      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000));
-      const renderPromise = toPng(cardRef.current, { quality: 1.0, pixelRatio: 1, fetchRequestInit: { cache: 'no-cache' } });
-      const dataUrl = await Promise.race([renderPromise, timeout]);
-      
+      const dataUrl = await toPng(cardRef.current, { quality: 1.0, pixelRatio: 1, cacheBust: true });
       const link = document.createElement('a');
       link.download = `omoggle-victory-${Date.now()}.png`;
       link.href = dataUrl;
@@ -116,18 +113,33 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   };
 
   const handleNativeShare = async () => {
-    if (preloadedShareFile && navigator.canShare && navigator.canShare({ files: [preloadedShareFile] })) {
-      try {
+    if (!cardRef.current) return;
+    setIsSharing(true);
+    try {
+      // Generate the image exactly when the user clicks the button
+      const dataUrl = await toPng(cardRef.current, { quality: 0.9, pixelRatio: 1, skipAutoScale: true, cacheBust: true });
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], "mog-victory.png", { type: "image/png" });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           title: 'Mog Battle Result',
           text: 'I just faced the scanner. Do you have the genetics to beat my score?',
-          files: [preloadedShareFile]
+          files: [file]
         });
-      } catch (err) {
-        console.log('User cancelled share or share failed', err);
+      } else {
+        // Fallback to direct download if the browser rejects the native share
+        const link = document.createElement('a');
+        link.download = `omoggle-victory-${Date.now()}.png`;
+        link.href = dataUrl;
+        link.click();
       }
-    } else {
-      handleDownloadCard(); 
+    } catch (err) {
+      console.error("Share failed:", err);
+      alert("Could not generate image. Your browser might be blocking it.");
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -137,7 +149,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
     setLiveMyScore(null);
     setTimer(5);
     setPhase('PREP');
-    setPreloadedShareFile(null); 
   };
 
   type Phase = 'WAITING' | 'PREP' | 'BATTLE' | 'SCORING' | 'RESULT';
@@ -147,42 +158,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
-
-  // Background Pre-render with Watchdog Timer
-  useEffect(() => {
-    if (phase === 'RESULT' && !preloadedShareFile && !isPreloading) {
-      setIsPreloading(true);
-      
-      setTimeout(async () => {
-        if (!cardRef.current) {
-          setIsPreloading(false); 
-          return;
-        }
-        try {
-          // FIX 1: Watchdog Timer. If html-to-image hangs for 2.5 seconds, we kill it to unstick the button.
-          const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Render timeout")), 2500));
-          
-          const renderPromise = toPng(cardRef.current, { 
-            quality: 0.9, 
-            pixelRatio: 1,
-            skipAutoScale: true,
-            fetchRequestInit: { cache: 'no-cache' } // Helps bypass aggressive CORS caching
-          });
-
-          const dataUrl = await Promise.race([renderPromise, timeout]);
-          const res = await fetch(dataUrl);
-          const blob = await res.blob();
-          const file = new File([blob], "mog-victory.png", { type: "image/png" });
-          setPreloadedShareFile(file);
-        } catch (err) {
-          console.warn("Background pre-render timed out or failed:", err);
-          // If it fails, we just silently fail and let the user try the manual download button
-        } finally {
-          setIsPreloading(false); // GUARANTEED to unstick the button
-        }
-      }, 500); 
-    }
-  }, [phase, preloadedShareFile, isPreloading]);
 
   const [timer, setTimer] = useState<number>(0);
   const [myScore, setMyScore] = useState<number | null>(null);
@@ -224,6 +199,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
     }
   }, [isConnected, phase, sendTelemetry, localProfile, trackEvent]);
 
+  // FIX 1 & 2: The completely rebuilt, bulletproof loop
   const handleLocalVideoReady = () => {
     const loop = () => {
       if (localVideoRef.current && localCanvasRef.current && isLoaded) {
@@ -236,65 +212,67 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
           const ctx = canvas.getContext("2d");
 
           if (ctx) {
+            // FIX 1: ALWAYS clear the canvas, every single frame, no exceptions.
+            // This guarantees the mesh disappears instantly when the match ends.
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // FIX 2: Stop drawing the mesh and laser if the battle is over
-            if (phaseRef.current === 'SCORING' || phaseRef.current === 'RESULT') {
-              requestRef.current = requestAnimationFrame(loop);
-              return; 
-            }
+            // Only draw the graphics and run the scanner if the battle is actually active
+            if (phaseRef.current !== 'SCORING' && phaseRef.current !== 'RESULT') {
+              const timeMs = performance.now();
+              const scanY = ((timeMs % 3000) / 3000) * canvas.height;
+              ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(canvas.width, scanY);
+              ctx.strokeStyle = "rgba(57, 255, 20, 0.4)"; ctx.lineWidth = 1.5; ctx.stroke();
 
-            const timeMs = performance.now();
-            const scanY = ((timeMs % 3000) / 3000) * canvas.height;
-            ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(canvas.width, scanY);
-            ctx.strokeStyle = "rgba(57, 255, 20, 0.4)"; ctx.lineWidth = 1.5; ctx.stroke();
+              // FIX 2: Try/Catch Sandbox. If the scanner crashes, the loop survives.
+              try {
+                const result = detect(video);
 
-            const result = detect(video);
-
-            if (result?.faceLandmarks?.[0]) {
-              const videoRatio = video.videoWidth / video.videoHeight;
-              const canvasRatio = canvas.width / canvas.height;
-              let rW, rH, oX, oY;
-              if (videoRatio > canvasRatio) {
-                rH = canvas.height; rW = video.videoWidth * (canvas.height / video.videoHeight);
-                oX = (canvas.width - rW) / 2; oY = 0;
-              } else {
-                rW = canvas.width; rH = video.videoHeight * (canvas.width / video.videoWidth);
-                oX = 0; oY = (canvas.height - rH) / 2;
-              }
-
-              const pts = SLEEK_INDICES.map(idx => {
-                const pt = result.faceLandmarks[0][idx] as any;
-                return pt ? { x: (pt.x * rW) + oX, y: (pt.y * rH) + oY } : null;
-              }).filter(Boolean) as {x: number, y: number}[];
-
-              ctx.lineWidth = 0.5; ctx.strokeStyle = "rgba(57, 255, 20, 0.2)"; ctx.beginPath();
-              for (let i = 0; i < pts.length; i++) {
-                for (let j = i + 1; j < pts.length; j++) {
-                  const dist = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
-                  if (dist < canvas.width * 0.25) { ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); }
-                }
-              }
-              ctx.stroke();
-
-              ctx.fillStyle = "#39FF14";
-              pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
-
-              if (phaseRef.current === 'BATTLE') {
-                if (result.faceLandmarks && result.faceLandmarks.length > 0) {
-                  const rawScore = calculateMogScore(result.faceLandmarks[0] as any);
-                  const currentScore = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0;
-
-                  if (currentScore > 1.0) {
-                    scoreHistoryRef.current.push(currentScore);
+                if (result?.faceLandmarks?.[0]) {
+                  const videoRatio = video.videoWidth / video.videoHeight;
+                  const canvasRatio = canvas.width / canvas.height;
+                  let rW, rH, oX, oY;
+                  if (videoRatio > canvasRatio) {
+                    rH = canvas.height; rW = video.videoWidth * (canvas.height / video.videoHeight);
+                    oX = (canvas.width - rW) / 2; oY = 0;
+                  } else {
+                    rW = canvas.width; rH = video.videoHeight * (canvas.width / video.videoWidth);
+                    oX = 0; oY = (canvas.height - rH) / 2;
                   }
-                  
-                  if (timeMs - lastTelemetryTime.current > 150) {
-                    setLiveMyScore(currentScore); 
-                    sendTelemetry("LIVE_SCORE", { score: currentScore });
-                    lastTelemetryTime.current = timeMs;
+
+                  const pts = SLEEK_INDICES.map(idx => {
+                    const pt = result.faceLandmarks[0][idx] as any;
+                    return pt ? { x: (pt.x * rW) + oX, y: (pt.y * rH) + oY } : null;
+                  }).filter(Boolean) as {x: number, y: number}[];
+
+                  ctx.lineWidth = 0.5; ctx.strokeStyle = "rgba(57, 255, 20, 0.2)"; ctx.beginPath();
+                  for (let i = 0; i < pts.length; i++) {
+                    for (let j = i + 1; j < pts.length; j++) {
+                      const dist = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+                      if (dist < canvas.width * 0.25) { ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); }
+                    }
+                  }
+                  ctx.stroke();
+
+                  ctx.fillStyle = "#39FF14";
+                  pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
+
+                  if (phaseRef.current === 'BATTLE') {
+                    const rawScore = calculateMogScore(result.faceLandmarks[0] as any);
+                    const currentScore = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0;
+
+                    if (currentScore > 1.0) {
+                      scoreHistoryRef.current.push(currentScore);
+                    }
+                    
+                    if (timeMs - lastTelemetryTime.current > 150) {
+                      setLiveMyScore(currentScore); 
+                      sendTelemetry("LIVE_SCORE", { score: currentScore });
+                      lastTelemetryTime.current = timeMs;
+                    }
                   }
                 }
+              } catch (err) {
+                console.warn("Scanner skipped frame due to error", err);
               }
             }
           }
@@ -357,7 +335,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const verdict = myScore !== null && opponentScore !== null ? getMatchVerdict(myScore, opponentScore) : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100vw", backgroundColor: "#09090b", overflow: "hidden", position: "relative" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100vw", backgroundColor: "#09090b", overflow: "hidden", position: "relative", zIndex: 1 }}>
 
       {/* Timer & Phase Indicators */}
       {(phase === 'PREP' || phase === 'BATTLE') && (
@@ -395,7 +373,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
             <button onClick={handleDownloadCard} style={{ padding: "12px 24px", backgroundColor: "white", color: "black", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>DOWNLOAD</button>
             <button 
               onClick={handleNativeShare} 
-              disabled={isPreloading && !preloadedShareFile}
+              disabled={isSharing}
               style={{ 
                 padding: "12px 24px", 
                 backgroundColor: "#a855f7", 
@@ -403,15 +381,15 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
                 border: "none", 
                 borderRadius: "8px", 
                 fontWeight: "bold", 
-                cursor: (isPreloading && !preloadedShareFile) ? "not-allowed" : "pointer", 
+                cursor: isSharing ? "not-allowed" : "pointer", 
                 fontSize: "14px",
-                opacity: (isPreloading && !preloadedShareFile) ? 0.5 : 1,
+                opacity: isSharing ? 0.5 : 1,
                 display: "flex",
                 alignItems: "center",
                 gap: "8px"
               }}
             >
-              {(isPreloading && !preloadedShareFile) ? (
+              {isSharing ? (
                 <>
                   <div style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%", animation: "spin 0.6s linear infinite" }}></div>
                   PREPARING...
@@ -441,8 +419,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         </div>
       )}
 
-      {/* Hidden Share Card for Capture - Using fixed off-screen placement to avoid Safari Paint issues */}
-      <div style={{ position: "fixed", left: "-10000px", top: "-10000px", width: "1200px", height: "630px", pointerEvents: "none" }}>
+      {/* Hidden Share Card */}
+      <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
         <div ref={cardRef}>
           <ShareCard 
             playerName={localProfile.name}
