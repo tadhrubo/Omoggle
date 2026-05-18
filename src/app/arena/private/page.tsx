@@ -149,12 +149,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
 
   type Phase = 'WAITING' | 'PREP' | 'BATTLE' | 'SCORING' | 'RESULT';
   const [phase, setPhase] = useState<Phase>('WAITING');
-  const phaseRef = useRef<Phase>('WAITING');
-
-  useEffect(() => {
-    phaseRef.current = phase;
-  }, [phase]);
-
+  
   const [timer, setTimer] = useState<number>(0);
   const [myScore, setMyScore] = useState<number | null>(null);
   const [liveMyScore, setLiveMyScore] = useState<number | null>(null);
@@ -178,10 +173,18 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
 
   const { isLoaded, detect } = useFaceScanner({ enabled: true });
   
+  // REF WRAPPERS: These completely solve the Stale Closure bug
+  const phaseRef = useRef(phase);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
+
   const telemetryRef = useRef(sendTelemetry);
-  useEffect(() => {
-    telemetryRef.current = sendTelemetry;
-  }, [sendTelemetry]);
+  useEffect(() => { telemetryRef.current = sendTelemetry; }, [sendTelemetry]);
+
+  const isLoadedRef = useRef(isLoaded);
+  useEffect(() => { isLoadedRef.current = isLoaded; }, [isLoaded]);
+
+  const detectRef = useRef(detect);
+  useEffect(() => { detectRef.current = detect; }, [detect]);
 
   useEffect(() => {
     if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream;
@@ -200,92 +203,92 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
     }
   }, [isConnected, phase, localProfile, trackEvent]);
 
-  // FIX: The loop is now safely bound in a useEffect and waits strictly for `isLoaded`
-  useEffect(() => {
-    if (!isLoaded || !localVideoRef.current || !localCanvasRef.current) return;
+  // RESTORED: Triggered flawlessly by the <video> tag
+  const handleLocalVideoReady = () => {
+    if (requestRef.current) cancelAnimationFrame(requestRef.current);
 
     const loop = () => {
-      const video = localVideoRef.current;
-      const canvas = localCanvasRef.current;
+      if (localVideoRef.current && localCanvasRef.current) {
+        const video = localVideoRef.current;
+        const canvas = localCanvasRef.current;
 
-      if (video && canvas && video.readyState >= 2 && video.videoWidth > 0) {
-        canvas.width = video.clientWidth;
-        canvas.height = video.clientHeight;
-        const ctx = canvas.getContext("2d");
+        if (video.readyState >= 2 && video.videoWidth > 0) {
+          canvas.width = video.clientWidth;
+          canvas.height = video.clientHeight;
+          const ctx = canvas.getContext("2d");
 
-        if (ctx) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          
-          if (phaseRef.current === 'SCORING' || phaseRef.current === 'RESULT') {
-            requestRef.current = requestAnimationFrame(loop);
-            return; 
-          }
+          if (ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (phaseRef.current === 'SCORING' || phaseRef.current === 'RESULT') {
+              requestRef.current = requestAnimationFrame(loop);
+              return; 
+            }
 
-          const timeMs = performance.now();
-          const scanY = ((timeMs % 3000) / 3000) * canvas.height;
-          ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(canvas.width, scanY);
-          ctx.strokeStyle = "rgba(57, 255, 20, 0.4)"; ctx.lineWidth = 1.5; ctx.stroke();
+            // Only run the AI math if the model is ready
+            if (isLoadedRef.current && detectRef.current) {
+              const timeMs = performance.now();
+              const scanY = ((timeMs % 3000) / 3000) * canvas.height;
+              ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(canvas.width, scanY);
+              ctx.strokeStyle = "rgba(57, 255, 20, 0.4)"; ctx.lineWidth = 1.5; ctx.stroke();
 
-          try {
-            const result = detect(video);
-            if (result?.faceLandmarks?.[0]) {
-              const videoRatio = video.videoWidth / video.videoHeight;
-              const canvasRatio = canvas.width / canvas.height;
-              let rW, rH, oX, oY;
-              if (videoRatio > canvasRatio) {
-                rH = canvas.height; rW = video.videoWidth * (canvas.height / video.videoHeight);
-                oX = (canvas.width - rW) / 2; oY = 0;
-              } else {
-                rW = canvas.width; rH = video.videoHeight * (canvas.width / video.videoWidth);
-                oX = 0; oY = (canvas.height - rH) / 2;
-              }
+              try {
+                const result = detectRef.current(video);
+                if (result?.faceLandmarks?.[0]) {
+                  const videoRatio = video.videoWidth / video.videoHeight;
+                  const canvasRatio = canvas.width / canvas.height;
+                  let rW, rH, oX, oY;
+                  if (videoRatio > canvasRatio) {
+                    rH = canvas.height; rW = video.videoWidth * (canvas.height / video.videoHeight);
+                    oX = (canvas.width - rW) / 2; oY = 0;
+                  } else {
+                    rW = canvas.width; rH = video.videoHeight * (canvas.width / video.videoWidth);
+                    oX = 0; oY = (canvas.height - rH) / 2;
+                  }
 
-              const pts = SLEEK_INDICES.map(idx => {
-                const pt = result.faceLandmarks[0][idx] as any;
-                return pt ? { x: (pt.x * rW) + oX, y: (pt.y * rH) + oY } : null;
-              }).filter(Boolean) as {x: number, y: number}[];
+                  const pts = SLEEK_INDICES.map(idx => {
+                    const pt = result.faceLandmarks[0][idx] as any;
+                    return pt ? { x: (pt.x * rW) + oX, y: (pt.y * rH) + oY } : null;
+                  }).filter(Boolean) as {x: number, y: number}[];
 
-              ctx.lineWidth = 0.5; ctx.strokeStyle = "rgba(57, 255, 20, 0.2)"; ctx.beginPath();
-              for (let i = 0; i < pts.length; i++) {
-                for (let j = i + 1; j < pts.length; j++) {
-                  const dist = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
-                  if (dist < canvas.width * 0.25) { ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); }
+                  ctx.lineWidth = 0.5; ctx.strokeStyle = "rgba(57, 255, 20, 0.2)"; ctx.beginPath();
+                  for (let i = 0; i < pts.length; i++) {
+                    for (let j = i + 1; j < pts.length; j++) {
+                      const dist = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+                      if (dist < canvas.width * 0.25) { ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); }
+                    }
+                  }
+                  ctx.stroke();
+
+                  ctx.fillStyle = "#39FF14";
+                  pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
+
+                  if (phaseRef.current === 'BATTLE') {
+                    const rawScore = calculateMogScore(result.faceLandmarks[0] as any);
+                    const currentScore = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0;
+
+                    if (currentScore > 1.0) {
+                      scoreHistoryRef.current.push(currentScore);
+                    }
+                    
+                    if (timeMs - lastTelemetryTime.current > 150) {
+                      setLiveMyScore(currentScore); 
+                      telemetryRef.current("LIVE_SCORE", { score: currentScore });
+                      lastTelemetryTime.current = timeMs;
+                    }
+                  }
                 }
-              }
-              ctx.stroke();
-
-              ctx.fillStyle = "#39FF14";
-              pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
-
-              if (phaseRef.current === 'BATTLE') {
-                const rawScore = calculateMogScore(result.faceLandmarks[0] as any);
-                const currentScore = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0;
-
-                if (currentScore > 1.0) {
-                  scoreHistoryRef.current.push(currentScore);
-                }
-                
-                if (timeMs - lastTelemetryTime.current > 150) {
-                  setLiveMyScore(currentScore); 
-                  telemetryRef.current("LIVE_SCORE", { score: currentScore });
-                  lastTelemetryTime.current = timeMs;
-                }
+              } catch (err) {
+                console.warn("Scanner skipped frame due to error", err);
               }
             }
-          } catch (err) {
-            console.warn("Scanner skipped frame due to error", err);
           }
         }
       }
       requestRef.current = requestAnimationFrame(loop);
     };
-
     requestRef.current = requestAnimationFrame(loop);
-
-    return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
-    };
-  }, [isLoaded, detect]); 
+  };
 
   useEffect(() => {
     if (phase === 'WAITING' || phase === 'SCORING' || phase === 'RESULT') return;
@@ -488,8 +491,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         </div>
 
         <div className="video-box" style={{ borderTop: "2px solid #27272a" }}>
-          {/* FIX: onLoadedData completely removed here to prevent closure trap */}
-          <video ref={localVideoRef} autoPlay playsInline muted className="video-element" style={{ transform: "scaleX(-1)", position: "relative", zIndex: 10 }} />
+          {/* RESTORED: onLoadedData handles initialization safely */}
+          <video ref={localVideoRef} autoPlay playsInline muted onLoadedData={handleLocalVideoReady} className="video-element" style={{ transform: "scaleX(-1)", position: "relative", zIndex: 10 }} />
           <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 15, pointerEvents: "none", transform: "scaleX(-1)" }} />
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
             <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{localProfile.name}</div>
