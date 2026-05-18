@@ -268,6 +268,8 @@ export default function RootLayout({
         />
         <link rel="preconnect" href="https://nzucpacdzzjzoeyyzban.supabase.co" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://discord.gg" />
+        {/* --- Google AdSense Verification --- */}
+        <meta name="google-adsense-account" content="ca-pub-3979167601320086" />
       </head>
 
       <body>
