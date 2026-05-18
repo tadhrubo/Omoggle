@@ -150,16 +150,23 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
     phaseRef.current = phase;
   }, [phase]);
 
-  // Background Pre-render for Share Card
+  // Background Pre-render for Share Card - FIXED STATE LOCK
   useEffect(() => {
     if (phase === 'RESULT' && !preloadedShareFile && !isPreloading) {
       setIsPreloading(true);
       
       // Give the DOM 500ms to fully paint the hidden share card before capturing
       setTimeout(async () => {
-        if (!cardRef.current) return;
+        if (!cardRef.current) {
+          setIsPreloading(false); // FIX: Reset state if ref is missing
+          return;
+        }
         try {
-          const dataUrl = await toPng(cardRef.current, { quality: 0.9, pixelRatio: 1 });
+          const dataUrl = await toPng(cardRef.current, { 
+            quality: 0.9, 
+            pixelRatio: 1,
+            skipAutoScale: true // FIX: Helps prevent mobile rendering hangs
+          });
           const res = await fetch(dataUrl);
           const blob = await res.blob();
           const file = new File([blob], "mog-victory.png", { type: "image/png" });
@@ -211,7 +218,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
       setTimer(5);
       trackEvent("battle_join");
     }
-  }, [isConnected, phase, sendTelemetry, localProfile]);
+  }, [isConnected, phase, sendTelemetry, localProfile, trackEvent]);
 
   const handleLocalVideoReady = () => {
     const loop = () => {
@@ -262,21 +269,14 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
               pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
 
               if (phaseRef.current === 'BATTLE') {
-                // 1. Guard against empty frames (when no face is detected)
                 if (result.faceLandmarks && result.faceLandmarks.length > 0) {
-                  
-                  // 2. Remove the `.score` accessor. The function returns a raw number.
                   const rawScore = calculateMogScore(result.faceLandmarks[0] as any);
-                  
-                  // 3. Fallback just in case the math returns NaN
                   const currentScore = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0;
 
                   if (currentScore > 1.0) {
                     scoreHistoryRef.current.push(currentScore);
-                    console.log("Captured frame score:", currentScore);
                   }
                   
-                  // Live telemetry throttling (150ms)
                   if (timeMs - lastTelemetryTime.current > 150) {
                     setLiveMyScore(currentScore); 
                     sendTelemetry("LIVE_SCORE", { score: currentScore });
@@ -320,9 +320,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   useEffect(() => {
     if (phase === 'SCORING') {
       const scores = scoreHistoryRef.current;
-      console.log("Final array of scores collected:", scores); // Debugging
 
-      let finalScore = 4.5; // Default fallback
+      let finalScore = 4.5; 
       if (scores.length > 0) {
         finalScore = Math.max(...scores);
       }
@@ -343,7 +342,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
       playResultSound(isWinner);
       trackEvent("battle_complete");
     }
-  }, [myScore, opponentScore]);
+  }, [myScore, opponentScore, trackEvent]);
 
   const verdict = myScore !== null && opponentScore !== null ? getMatchVerdict(myScore, opponentScore) : null;
 
@@ -432,8 +431,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         </div>
       )}
 
-      {/* Hidden Share Card for Capture */}
-      <div style={{ position: "absolute", left: "-9999px", top: 0, pointerEvents: "none" }}>
+      {/* Hidden Share Card for Capture - FIXED CSS */}
+      <div style={{ position: "absolute", left: 0, top: 0, zIndex: -50, opacity: 0.01, pointerEvents: "none" }}>
         <div ref={cardRef}>
           <ShareCard 
             playerName={localProfile.name}
