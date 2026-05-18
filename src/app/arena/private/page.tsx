@@ -81,9 +81,6 @@ const getMatchVerdict = (localScore: number, remoteScore: number) => {
   return { title: resultTitle, sub: resultSubtitle, color: titleColor };
 };
 
-// ============================================================================
-// PRIVATE ROOM BATTLE COMPONENT
-// ============================================================================
 function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localProfile: any }) {
   const router = useRouter();
   const { trackEvent } = useAnalytics();
@@ -155,7 +152,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const [liveMyScore, setLiveMyScore] = useState<number | null>(null);
 
   const {
-    localStream, remoteStream, isSearching, isConnected,
+    localStream, remoteStream, isSearching, isConnected, isDataConnected,
     opponentScore, liveOpponentScore, remoteProfile, skip, sendTelemetry, error,
     rematchState, requestRematch, acceptRematch
   } = usePrivateRoom({
@@ -186,24 +183,63 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const detectRef = useRef(detect);
   useEffect(() => { detectRef.current = detect; }, [detect]);
 
+  // Robust effect to manage local video stream, programmatic play, loop initialization, and unmount cleanup
   useEffect(() => {
-    if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream;
+    const video = localVideoRef.current;
+    if (video && localStream) {
+      video.srcObject = localStream;
+      video.play()
+        .then(() => {
+          console.log("Local video started playing successfully.");
+        })
+        .catch(err => {
+          console.warn("Local video play failed or was interrupted:", err);
+        });
+      
+      // Immediately start the animation loop to ensure we catch frame updates
+      handleLocalVideoReady();
+    }
+    
+    return () => {
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+      }
+    };
   }, [localStream]);
 
+  // Robust effect to manage remote video stream
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
+    const video = remoteVideoRef.current;
+    if (video && remoteStream) {
+      video.srcObject = remoteStream;
+      video.play().catch(err => console.warn("Remote video play failed:", err));
+    }
   }, [remoteStream]);
 
+  // Guarantee that the canvas wipes clean when the match ends or when phase changes
   useEffect(() => {
-    if (isConnected && phase === 'WAITING') {
+    if (phase === 'SCORING' || phase === 'RESULT' || phase === 'WAITING') {
+      const canvas = localCanvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+    }
+  }, [phase]);
+
+  // Guard profile sync transition until both the video and data streams are established
+  useEffect(() => {
+    if (isConnected && isDataConnected && phase === 'WAITING') {
       telemetryRef.current("PROFILE_SYNC", { profile: localProfile });
       setPhase('PREP');
       setTimer(5);
       trackEvent("battle_join");
     }
-  }, [isConnected, phase, localProfile, trackEvent]);
+  }, [isConnected, isDataConnected, phase, localProfile, trackEvent]);
 
-  // RESTORED: Triggered flawlessly by the <video> tag
+  // RESTORED: Triggered flawlessly by the local stream
   const handleLocalVideoReady = () => {
     if (requestRef.current) cancelAnimationFrame(requestRef.current);
 
@@ -213,10 +249,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         const canvas = localCanvasRef.current;
 
         if (video.readyState >= 2 && video.videoWidth > 0) {
-          if (video.width !== video.videoWidth) {
-            video.width = video.videoWidth;
-            video.height = video.videoHeight;
-          }
           canvas.width = video.clientWidth;
           canvas.height = video.clientHeight;
           const ctx = canvas.getContext("2d");
@@ -496,7 +528,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
 
         <div className="video-box" style={{ borderTop: "2px solid #27272a" }}>
           {/* RESTORED: onLoadedData handles initialization safely */}
-          <video ref={localVideoRef} autoPlay playsInline muted onLoadedData={handleLocalVideoReady} className="video-element" style={{ transform: "scaleX(-1)", position: "relative", zIndex: 10 }} />
+          <video ref={localVideoRef} autoPlay playsInline muted className="video-element" style={{ transform: "scaleX(-1)", position: "relative", zIndex: 10 }} />
           <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 15, pointerEvents: "none", transform: "scaleX(-1)" }} />
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
             <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{localProfile.name}</div>

@@ -15,6 +15,7 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect, onRem
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isWaiting, setIsWaiting] = useState(true);
   const [isConnected, setIsConnected] = useState(false);
+  const [isDataConnected, setIsDataConnected] = useState(false);
   const [opponentScore, setOpponentScore] = useState<number | null>(null);
   const [liveOpponentScore, setLiveOpponentScore] = useState<number | null>(null);
   const [remoteProfile, setRemoteProfile] = useState<any>(null);
@@ -45,6 +46,7 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect, onRem
 
   const setupDataConnection = useCallback((conn: DataConnection) => {
     dataConnRef.current = conn;
+    conn.on("open", () => setIsDataConnected(true));
     conn.on("data", (data: any) => {
       if (!data || !data.type) return;
       if (data.type === "PROFILE_SYNC") setRemoteProfile(data.profile);
@@ -206,6 +208,7 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect, onRem
     remoteStream,
     isSearching: isWaiting,
     isConnected,
+    isDataConnected,
     opponentScore,
     liveOpponentScore,
     remoteProfile,

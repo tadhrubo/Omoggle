@@ -87,31 +87,77 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
 
   const { isLoaded, detect } = useFaceScanner({ enabled: true });
 
-  // REF WRAPPERS: These completely solve the Stale Closure bug
   const phaseRef = useRef(battlePhase);
-  useEffect(() => { phaseRef.current = battlePhase; }, [battlePhase]);
+  useEffect(() => {
+    phaseRef.current = battlePhase;
+  }, [battlePhase]);
   
   const telemetryRef = useRef(sendTelemetry);
-  useEffect(() => { telemetryRef.current = sendTelemetry; }, [sendTelemetry]);
+  useEffect(() => {
+    telemetryRef.current = sendTelemetry;
+  }, [sendTelemetry]);
 
   const isLoadedRef = useRef(isLoaded);
-  useEffect(() => { isLoadedRef.current = isLoaded; }, [isLoaded]);
+  useEffect(() => {
+    isLoadedRef.current = isLoaded;
+  }, [isLoaded]);
 
   const detectRef = useRef(detect);
-  useEffect(() => { detectRef.current = detect; }, [detect]);
-
   useEffect(() => {
-    if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream;
+    detectRef.current = detect;
+  }, [detect]);
+
+  // Robust effect to manage local video stream, programmatic play, loop initialization, and unmount cleanup
+  useEffect(() => {
+    const video = localVideoRef.current;
+    if (video && localStream) {
+      video.srcObject = localStream;
+      video.play()
+        .then(() => {
+          console.log("Local video started playing successfully.");
+        })
+        .catch(err => {
+          console.warn("Local video play failed or was interrupted:", err);
+        });
+      
+      // Immediately start the animation loop to ensure we catch frame updates
+      handleLocalVideoReady();
+    }
+    
+    return () => {
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+      }
+    };
   }, [localStream]);
 
+  // Robust effect to manage remote video stream
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
+    const video = remoteVideoRef.current;
+    if (video && remoteStream) {
+      video.srcObject = remoteStream;
+      video.play().catch(err => console.warn("Remote video play failed:", err));
+    }
   }, [remoteStream]);
 
+  // Guarantee that the canvas wipes clean when the match ends or when phase changes
   useEffect(() => {
-    if (isConnected && isDataConnected && battlePhase === "waiting") {
+    if (battlePhase === 'result' || battlePhase === 'waiting') {
+      const canvas = localCanvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+    }
+  }, [battlePhase]);
+
+  // Guard profile sync transition until both the video and data streams are established
+  useEffect(() => {
+    if (isConnected && isDataConnected && battlePhase === 'waiting') {
       telemetryRef.current("PROFILE_SYNC", { profile: localProfile });
-      setBattlePhase("connected");
+      setBattlePhase('connected');
       setCountdown(5);
       trackEvent("battle_join");
       setTimeout(() => setBattlePhase("countdown"), 1000);
@@ -171,7 +217,6 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
     }
   }, [countdown, battlePhase, myScore, liveMyScore, opponentScore, mode, localProfile, remoteProfile, supabase, trackEvent]);
 
-  // RESTORED: Triggered flawlessly by the <video> tag
   const handleLocalVideoReady = () => {
     if (requestRef.current) cancelAnimationFrame(requestRef.current);
     
@@ -181,10 +226,6 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
         const canvas = localCanvasRef.current;
         
         if (video.readyState >= 2 && video.videoWidth > 0) {
-          if (video.width !== video.videoWidth) {
-            video.width = video.videoWidth;
-            video.height = video.videoHeight;
-          }
           canvas.width = video.clientWidth;
           canvas.height = video.clientHeight;
           const ctx = canvas.getContext("2d");
@@ -197,7 +238,6 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
               return; 
             }
 
-            // Only run the AI math if the model is ready
             if (isLoadedRef.current && detectRef.current) {
               const timeMs = performance.now();
               const scanY = ((timeMs % 3000) / 3000) * canvas.height;
@@ -272,7 +312,6 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100vw", backgroundColor: "#09090b", overflow: "hidden", position: "relative" }}>
       
-      {/* Result Overlay with ELO Update */}
       {battlePhase === "result" && verdict && (
         <div style={{ position: "absolute", inset: 0, zIndex: 100, backgroundColor: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           
@@ -302,7 +341,6 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
         </div>
       )}
 
-      {/* DYNAMIC Header */}
       <div style={{ flex: "none", height: "60px", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px 0 85px", borderBottom: "1px solid #27272a" }}>
         <button onClick={() => router.push("/lobby")} style={{ color: "#71717a", background: "none", border: "none", cursor: "pointer", fontFamily: "monospace" }}>← LOBBY</button>
         <h1 style={{ color: mode === "ranked" ? "#fbbf24" : "#ef4444", fontWeight: "900", letterSpacing: "2px", margin: 0, fontSize: "20px" }}>
@@ -312,7 +350,6 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
       </div>
 
       <div className="flex flex-col md:flex-row w-full h-full flex-1 overflow-hidden">
-        {/* Top/Left: Opponent View */}
         <div className="relative flex-1 w-full md:w-1/2 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-zinc-800 bg-black">
           {isSearching && (
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: mode === "ranked" ? "#fbbf24" : "#ef4444", zIndex: 10 }}>
@@ -336,10 +373,8 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
           )}
         </div>
 
-        {/* Bottom/Right: Local View */}
         <div className="relative flex-1 w-full md:w-1/2 h-1/2 md:h-full bg-black">
-          {/* RESTORED: onLoadedData handles initialization safely */}
-          <video ref={localVideoRef} autoPlay playsInline muted onLoadedData={handleLocalVideoReady} style={{ position: "absolute", width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />
+          <video ref={localVideoRef} autoPlay playsInline muted style={{ position: "absolute", width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />
           <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 2, pointerEvents: "none", transform: "scaleX(-1)" }} />
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
             <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{localProfile.name}</div>
@@ -354,7 +389,6 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
         </div>
       </div>
 
-      {/* Footer - Skip + Report */}
       <div style={{ flex: "none", height: "80px", display: "flex", alignItems: "center", justifyContent: "center", gap: "20px", borderTop: "1px solid #27272a", backgroundColor: "#09090b", zIndex: 110 }}>
         <button onClick={() => {
           if (remoteProfile?.id && localProfile.id) {
@@ -373,9 +407,6 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
   );
 }
 
-// ============================================================================
-// 2. DATA LOADER
-// ============================================================================
 function ArenaDataLoader() {
   const searchParams = useSearchParams();
   const mode = (searchParams.get("mode") as "casual" | "ranked") || "casual";
