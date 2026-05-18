@@ -25,7 +25,6 @@ export function useFaceScanner({
   const [isLoaded, setIsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [landmarks, setLandmarks] = useState<FaceLandmarkerResult | null>(null);
 
   const landmarkerRef = useRef<FaceLandmarker | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -98,7 +97,7 @@ export function useFaceScanner({
         lastVideoTimeRef.current = startTimeMs;
 
         if (result.faceLandmarks && result.faceLandmarks.length > 0) {
-          setLandmarks(result);
+          // Landmarks state update removed to prevent 60fps re-renders in parent components
         }
         return result;
       } catch (error) {
@@ -115,6 +114,6 @@ export function useFaceScanner({
     isLoading,
     error,
     detect,
-    landmarks,
+    landmarks: null,
   };
 }

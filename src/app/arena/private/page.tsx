@@ -213,6 +213,10 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         const canvas = localCanvasRef.current;
 
         if (video.readyState >= 2 && video.videoWidth > 0) {
+          if (video.width !== video.videoWidth) {
+            video.width = video.videoWidth;
+            video.height = video.videoHeight;
+          }
           canvas.width = video.clientWidth;
           canvas.height = video.clientHeight;
           const ctx = canvas.getContext("2d");
