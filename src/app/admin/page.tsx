@@ -1,103 +1,105 @@
 import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
+import AdminDashboardClient from "./AdminDashboardClient";
+import AdminLogin from "./AdminLogin";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
+  // ─── ADMIN SESSION AUTHENTICATION ───
+  const cookieStore = await cookies();
+  const adminSession = cookieStore.get("admin_session")?.value;
+
+  const adminPassword = process.env.ADMIN_PASSWORD || "omoggleadmin2026";
+  const expectedToken = Buffer.from(adminPassword).toString("base64");
+
+  if (adminSession !== expectedToken) {
+    return <AdminLogin />;
+  }
+
+  // ─── TELEMETRY DATA FETCHING ───
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  // Fetch last 30 days of events
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  // Fetch last 90 days of analytics events
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-  const { data: events, error } = await supabase
-    .from('analytics_events')
-    .select('*')
-    .gte('created_at', thirtyDaysAgo.toISOString());
+  const [eventsResult, profilesResult, matchesResult] = await Promise.all([
+    supabase
+      .from("analytics_events")
+      .select("*")
+      .gte("created_at", ninetyDaysAgo.toISOString()),
+    
+    supabase
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false }),
 
-  if (error) return <div className="text-red-500 p-10">Error: {error.message}</div>;
-  const safeEvents = events || [];
+    supabase
+      .from("matches")
+      .select("*")
+      .order("created_at", { ascending: false })
+  ]);
 
-  // --- CORE MATH ---
-  const now = new Date().getTime();
-  const oneDay = 24 * 60 * 60 * 1000;
+  if (eventsResult.error || profilesResult.error || matchesResult.error) {
+    const errorDetails = eventsResult.error?.message || profilesResult.error?.message || matchesResult.error?.message;
+    return (
+      <div className="min-h-screen bg-black text-red-500 flex flex-col justify-center items-center font-mono p-10 gap-4">
+        <h1 className="text-2xl font-black tracking-widest uppercase">DATALINK CRITICAL FAILURE</h1>
+        <p className="text-sm text-zinc-500">Failed to establish connection to analytics dataset.</p>
+        <code className="text-xs bg-red-950/40 border border-red-900 px-4 py-2 rounded text-red-400 max-w-lg overflow-x-auto">
+          {errorDetails}
+        </code>
+      </div>
+    );
+  }
 
-  const totalSessions = safeEvents.filter(e => e.event_type === 'session_start').length;
-  const battlesJoined = safeEvents.filter(e => e.event_type === 'battle_join').length;
-  const battlesCompleted = safeEvents.filter(e => e.event_type === 'battle_complete').length;
-  const completionRate = battlesJoined > 0 ? Math.round((battlesCompleted / battlesJoined) * 100) : 0;
+  // Prepare safe data transfers
+  const safeEvents = (eventsResult.data || []).map((e: any) => ({
+    id: e.id,
+    event_type: e.event_type,
+    user_id: e.user_id,
+    created_at: e.created_at,
+  }));
 
-  // Group user activity
-  const userFirstSeen = new Map<string, number>();
-  safeEvents.forEach(e => {
-    const time = new Date(e.created_at).getTime();
-    if (!userFirstSeen.has(e.user_id) || time < userFirstSeen.get(e.user_id)!) {
-      userFirstSeen.set(e.user_id, time);
-    }
-  });
+  const safeProfiles = (profilesResult.data || []).map((p: any) => ({
+    id: p.id,
+    username: p.username || "Anonymous Player",
+    elo: p.elo || 1200,
+    tier: p.tier || "MTN",
+    wins: p.wins || 0,
+    matches_played: p.matches_played || 0,
+    current_streak: p.current_streak || 0,
+    highest_streak: p.highest_streak || 0,
+    peak_elo: p.peak_elo || 1200,
+    total_mogs: p.total_mogs || 0,
+    total_mogged: p.total_mogged || 0,
+    profile_views: p.profile_views || 0,
+    is_banned: p.is_banned || false,
+    report_count: p.report_count || 0,
+    avatar_url: p.avatar_url || "",
+    created_at: p.created_at,
+  }));
 
-  const uniqueUsers = userFirstSeen.size;
-  const sessionsPerUser = uniqueUsers > 0 ? (totalSessions / uniqueUsers).toFixed(1) : "0";
+  const safeMatches = (matchesResult.data || []).map((m: any) => ({
+    id: m.id,
+    winner_id: m.winner_id,
+    loser_id: m.loser_id,
+    winner_score: m.winner_score,
+    loser_score: m.loser_score,
+    elo_change: m.elo_change,
+    mode: m.mode || "casual",
+    created_at: m.created_at,
+  }));
 
-  // DAU & New vs Returning
-  const dauUsers = new Set(safeEvents.filter(e => now - new Date(e.created_at).getTime() <= oneDay).map(e => e.user_id));
-  const dau = dauUsers.size;
-  
-  let newDau = 0, returningDau = 0;
-  dauUsers.forEach(uid => {
-    (now - userFirstSeen.get(uid)! <= oneDay) ? newDau++ : returningDau++;
-  });
-
-  // D1 Retention (Yesterday's Cohort)
-  let yesterdayCohort = 0, yesterdayRetained = 0;
-  userFirstSeen.forEach((firstTime, uid) => {
-    const age = now - firstTime;
-    if (age > oneDay && age <= 2 * oneDay) {
-      yesterdayCohort++;
-      if (dauUsers.has(uid)) yesterdayRetained++;
-    }
-  });
-  const d1Retention = yesterdayCohort > 0 ? Math.round((yesterdayRetained / yesterdayCohort) * 100) : 0;
-
-  // --- UI RENDER ---
   return (
-    <div className="min-h-screen bg-black text-white p-10 font-mono">
-      <h1 className="text-4xl font-bold mb-2 tracking-tighter">OMOGGLE // TRUTH PANEL</h1>
-      <p className="text-zinc-500 mb-10">ACQUISITION METRICS & PMF INDICATORS</p>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="border border-zinc-800 p-6 bg-zinc-950">
-          <p className="text-zinc-400 text-sm mb-2">DAU (24H)</p>
-          <p className="text-5xl font-black text-white">{dau}</p>
-          <p className="text-xs text-zinc-500 mt-2">{newDau} NEW / {returningDau} RETURNING</p>
-        </div>
-        <div className="border border-zinc-800 p-6 bg-zinc-950">
-          <p className="text-zinc-400 text-sm mb-2">D1 RETENTION</p>
-          <p className="text-5xl font-black text-green-500">{d1Retention}%</p>
-          <p className="text-xs text-zinc-500 mt-2">COHORT SIZE: {yesterdayCohort}</p>
-        </div>
-        <div className="border border-zinc-800 p-6 bg-zinc-950">
-          <p className="text-zinc-400 text-sm mb-2">BATTLE COMPLETION</p>
-          <p className="text-5xl font-black text-yellow-500">{completionRate}%</p>
-          <p className="text-xs text-zinc-500 mt-2">{battlesCompleted} DONE / {battlesJoined} STARTED</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="border border-zinc-800 p-6 bg-zinc-950">
-          <p className="text-zinc-400 text-sm mb-2">TOTAL SESSIONS (30D)</p>
-          <p className="text-4xl font-black text-white">{totalSessions}</p>
-        </div>
-        <div className="border border-zinc-800 p-6 bg-zinc-950">
-          <p className="text-zinc-400 text-sm mb-2">MAU (30D)</p>
-          <p className="text-4xl font-black text-white">{uniqueUsers}</p>
-        </div>
-        <div className="border border-zinc-800 p-6 bg-zinc-950">
-          <p className="text-zinc-400 text-sm mb-2">SESSIONS PER USER</p>
-          <p className="text-4xl font-black text-white">{sessionsPerUser}</p>
-        </div>
-      </div>
-    </div>
+    <AdminDashboardClient 
+      initialEvents={safeEvents} 
+      initialProfiles={safeProfiles} 
+      initialMatches={safeMatches}
+    />
   );
 }
+

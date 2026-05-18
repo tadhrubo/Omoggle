@@ -1,7 +1,6 @@
 "use client";
 import React from 'react';
 import QRCode from 'react-qr-code';
-import Image from 'next/image';
 
 interface ShareCardProps {
   playerName: string;
@@ -23,11 +22,18 @@ export default function ShareCard({
   return (
     <div id="share-card-container" className="w-[1080px] h-[1920px] relative overflow-hidden bg-black font-sans select-none z-0">
       {/* Absolute Background Image */}
-      <Image
+      <img
         src="/bg_pattern.jpg"
         alt="background"
-        fill
-        className="object-cover opacity-60 -z-10"
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          opacity: 0.6,
+          zIndex: -10
+        }}
       />
 
       {/* Custom Geometric Slash Lines (Overlay) */}
@@ -48,12 +54,14 @@ export default function ShareCard({
 
       {/* Logo */}
       <div className="absolute top-24 right-16 z-10">
-        <Image
+        <img
           src="/logo.png"
           alt="Mog Logo"
-          width={96}
-          height={96}
-          className="h-24 object-contain"
+          style={{
+            width: "96px",
+            height: "96px",
+            objectFit: "contain"
+          }}
         />
       </div>
 
