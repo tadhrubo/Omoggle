@@ -94,8 +94,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const lastTelemetryTime = useRef(0);
   const scoreHistoryRef = useRef<number[]>([]);
   const cardRef = useRef<HTMLDivElement>(null);
-  
-  // FIX 3: Replaced the broken background loader with a simple, on-demand loading state
   const [isSharing, setIsSharing] = useState(false);
 
   const handleDownloadCard = async () => {
@@ -116,7 +114,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
     if (!cardRef.current) return;
     setIsSharing(true);
     try {
-      // Generate the image exactly when the user clicks the button
       const dataUrl = await toPng(cardRef.current, { quality: 0.9, pixelRatio: 1, skipAutoScale: true, cacheBust: true });
       const res = await fetch(dataUrl);
       const blob = await res.blob();
@@ -129,7 +126,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
           files: [file]
         });
       } else {
-        // Fallback to direct download if the browser rejects the native share
         const link = document.createElement('a');
         link.download = `omoggle-victory-${Date.now()}.png`;
         link.href = dataUrl;
@@ -181,6 +177,12 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   });
 
   const { isLoaded, detect } = useFaceScanner({ enabled: true });
+  
+  // FIX: Protect the telemetry function from stale closures
+  const telemetryRef = useRef(sendTelemetry);
+  useEffect(() => {
+    telemetryRef.current = sendTelemetry;
+  }, [sendTelemetry]);
 
   useEffect(() => {
     if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream;
@@ -192,96 +194,99 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
 
   useEffect(() => {
     if (isConnected && phase === 'WAITING') {
-      sendTelemetry("PROFILE_SYNC", { profile: localProfile });
+      telemetryRef.current("PROFILE_SYNC", { profile: localProfile });
       setPhase('PREP');
       setTimer(5);
       trackEvent("battle_join");
     }
-  }, [isConnected, phase, sendTelemetry, localProfile, trackEvent]);
+  }, [isConnected, phase, localProfile, trackEvent]);
 
-  // FIX 1 & 2: The completely rebuilt, bulletproof loop
-  const handleLocalVideoReady = () => {
+  // FIX: The loop is now safely bound in a useEffect and waits strictly for `isLoaded`
+  useEffect(() => {
+    if (!isLoaded || !localVideoRef.current || !localCanvasRef.current) return;
+
     const loop = () => {
-      if (localVideoRef.current && localCanvasRef.current && isLoaded) {
-        const video = localVideoRef.current;
-        const canvas = localCanvasRef.current;
+      const video = localVideoRef.current;
+      const canvas = localCanvasRef.current;
 
-        if (video.readyState >= 2 && video.videoWidth > 0) {
-          canvas.width = video.clientWidth;
-          canvas.height = video.clientHeight;
-          const ctx = canvas.getContext("2d");
+      if (video && canvas && video.readyState >= 2 && video.videoWidth > 0) {
+        canvas.width = video.clientWidth;
+        canvas.height = video.clientHeight;
+        const ctx = canvas.getContext("2d");
 
-          if (ctx) {
-            // FIX 1: ALWAYS clear the canvas, every single frame, no exceptions.
-            // This guarantees the mesh disappears instantly when the match ends.
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Only draw the graphics and run the scanner if the battle is actually active
-            if (phaseRef.current !== 'SCORING' && phaseRef.current !== 'RESULT') {
-              const timeMs = performance.now();
-              const scanY = ((timeMs % 3000) / 3000) * canvas.height;
-              ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(canvas.width, scanY);
-              ctx.strokeStyle = "rgba(57, 255, 20, 0.4)"; ctx.lineWidth = 1.5; ctx.stroke();
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          if (phaseRef.current === 'SCORING' || phaseRef.current === 'RESULT') {
+            requestRef.current = requestAnimationFrame(loop);
+            return; 
+          }
 
-              // FIX 2: Try/Catch Sandbox. If the scanner crashes, the loop survives.
-              try {
-                const result = detect(video);
+          const timeMs = performance.now();
+          const scanY = ((timeMs % 3000) / 3000) * canvas.height;
+          ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(canvas.width, scanY);
+          ctx.strokeStyle = "rgba(57, 255, 20, 0.4)"; ctx.lineWidth = 1.5; ctx.stroke();
 
-                if (result?.faceLandmarks?.[0]) {
-                  const videoRatio = video.videoWidth / video.videoHeight;
-                  const canvasRatio = canvas.width / canvas.height;
-                  let rW, rH, oX, oY;
-                  if (videoRatio > canvasRatio) {
-                    rH = canvas.height; rW = video.videoWidth * (canvas.height / video.videoHeight);
-                    oX = (canvas.width - rW) / 2; oY = 0;
-                  } else {
-                    rW = canvas.width; rH = video.videoHeight * (canvas.width / video.videoWidth);
-                    oX = 0; oY = (canvas.height - rH) / 2;
-                  }
+          try {
+            const result = detect(video);
+            if (result?.faceLandmarks?.[0]) {
+              const videoRatio = video.videoWidth / video.videoHeight;
+              const canvasRatio = canvas.width / canvas.height;
+              let rW, rH, oX, oY;
+              if (videoRatio > canvasRatio) {
+                rH = canvas.height; rW = video.videoWidth * (canvas.height / video.videoHeight);
+                oX = (canvas.width - rW) / 2; oY = 0;
+              } else {
+                rW = canvas.width; rH = video.videoHeight * (canvas.width / video.videoWidth);
+                oX = 0; oY = (canvas.height - rH) / 2;
+              }
 
-                  const pts = SLEEK_INDICES.map(idx => {
-                    const pt = result.faceLandmarks[0][idx] as any;
-                    return pt ? { x: (pt.x * rW) + oX, y: (pt.y * rH) + oY } : null;
-                  }).filter(Boolean) as {x: number, y: number}[];
+              const pts = SLEEK_INDICES.map(idx => {
+                const pt = result.faceLandmarks[0][idx] as any;
+                return pt ? { x: (pt.x * rW) + oX, y: (pt.y * rH) + oY } : null;
+              }).filter(Boolean) as {x: number, y: number}[];
 
-                  ctx.lineWidth = 0.5; ctx.strokeStyle = "rgba(57, 255, 20, 0.2)"; ctx.beginPath();
-                  for (let i = 0; i < pts.length; i++) {
-                    for (let j = i + 1; j < pts.length; j++) {
-                      const dist = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
-                      if (dist < canvas.width * 0.25) { ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); }
-                    }
-                  }
-                  ctx.stroke();
-
-                  ctx.fillStyle = "#39FF14";
-                  pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
-
-                  if (phaseRef.current === 'BATTLE') {
-                    const rawScore = calculateMogScore(result.faceLandmarks[0] as any);
-                    const currentScore = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0;
-
-                    if (currentScore > 1.0) {
-                      scoreHistoryRef.current.push(currentScore);
-                    }
-                    
-                    if (timeMs - lastTelemetryTime.current > 150) {
-                      setLiveMyScore(currentScore); 
-                      sendTelemetry("LIVE_SCORE", { score: currentScore });
-                      lastTelemetryTime.current = timeMs;
-                    }
-                  }
+              ctx.lineWidth = 0.5; ctx.strokeStyle = "rgba(57, 255, 20, 0.2)"; ctx.beginPath();
+              for (let i = 0; i < pts.length; i++) {
+                for (let j = i + 1; j < pts.length; j++) {
+                  const dist = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+                  if (dist < canvas.width * 0.25) { ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); }
                 }
-              } catch (err) {
-                console.warn("Scanner skipped frame due to error", err);
+              }
+              ctx.stroke();
+
+              ctx.fillStyle = "#39FF14";
+              pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
+
+              if (phaseRef.current === 'BATTLE') {
+                const rawScore = calculateMogScore(result.faceLandmarks[0] as any);
+                const currentScore = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0;
+
+                if (currentScore > 1.0) {
+                  scoreHistoryRef.current.push(currentScore);
+                }
+                
+                if (timeMs - lastTelemetryTime.current > 150) {
+                  setLiveMyScore(currentScore); 
+                  telemetryRef.current("LIVE_SCORE", { score: currentScore });
+                  lastTelemetryTime.current = timeMs;
+                }
               }
             }
+          } catch (err) {
+            console.warn("Scanner skipped frame due to error", err);
           }
         }
       }
       requestRef.current = requestAnimationFrame(loop);
     };
+
     requestRef.current = requestAnimationFrame(loop);
-  };
+
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    };
+  }, [isLoaded, detect]); // Cleanly triggers the exact moment the AI model mounts
 
   useEffect(() => {
     if (phase === 'WAITING' || phase === 'SCORING' || phase === 'RESULT') return;
@@ -317,11 +322,9 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
       finalScore = parseFloat(finalScore.toFixed(1));
       setMyScore(finalScore);
 
-      if (sendTelemetry) {
-        sendTelemetry('FINAL_SCORE', { score: finalScore });
-      }
+      telemetryRef.current('FINAL_SCORE', { score: finalScore });
     }
-  }, [phase, sendTelemetry]);
+  }, [phase]);
 
   useEffect(() => {
     if (myScore !== null && opponentScore !== null) {
@@ -337,7 +340,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100vw", backgroundColor: "#09090b", overflow: "hidden", position: "relative", zIndex: 1 }}>
 
-      {/* Timer & Phase Indicators */}
       {(phase === 'PREP' || phase === 'BATTLE') && (
         <div style={{ position: "fixed", top: "80px", left: "50%", transform: "translateX(-50%)", zIndex: 50, display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
           <div style={{ color: "white", fontWeight: "900", letterSpacing: "5px", fontSize: "14px", backgroundColor: "rgba(0,0,0,0.5)", padding: "5px 15px", borderRadius: "99px" }}>
@@ -349,7 +351,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         </div>
       )}
 
-      {/* Result Overlay */}
       {phase === "RESULT" && verdict && (
         <div style={{ position: "fixed", inset: 0, zIndex: 100, backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           <h1 style={{ fontSize: "5.5rem", fontWeight: 900, color: verdict.color, textShadow: `0 0 30px ${verdict.color}80`, margin: 0, textAlign: "center", lineHeight: 1.1 }}>
@@ -419,7 +420,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         </div>
       )}
 
-      {/* Hidden Share Card */}
       <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
         <div ref={cardRef}>
           <ShareCard 
@@ -433,7 +433,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         </div>
       </div>
 
-      {/* Header */}
       <div style={{ flex: "none", height: "60px", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 20px 0 85px", borderBottom: "1px solid #27272a" }}>
         <button onClick={() => router.push("/lobby")} style={{ color: "#71717a", background: "none", border: "none", cursor: "pointer", fontFamily: "monospace" }}>← LOBBY</button>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -454,7 +453,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
       </div>
 
       <div className="arena-layout">
-        {/* Top: Opponent View */}
         <div className="video-box">
           {isSearching && (
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#22c55e", zIndex: 10, gap: "15px" }}>
@@ -490,9 +488,9 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
           )}
         </div>
 
-        {/* Bottom: Local View */}
         <div className="video-box" style={{ borderTop: "2px solid #27272a" }}>
-          <video ref={localVideoRef} autoPlay playsInline muted onLoadedData={handleLocalVideoReady} className="video-element" style={{ transform: "scaleX(-1)", position: "relative", zIndex: 10 }} />
+          {/* FIX: onLoadedData completely removed here so the trap can't happen */}
+          <video ref={localVideoRef} autoPlay playsInline muted className="video-element" style={{ transform: "scaleX(-1)", position: "relative", zIndex: 10 }} />
           <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 15, pointerEvents: "none", transform: "scaleX(-1)" }} />
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
             <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{localProfile.name}</div>
@@ -514,7 +512,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         </div>
       </div>
 
-      {/* Footer */}
       <div style={{ flex: "none", height: "80px", display: "flex", alignItems: "center", justifyContent: "center", gap: "20px", borderTop: "1px solid #27272a", backgroundColor: "#09090b", zIndex: 110 }}>
         <button onClick={() => router.push("/lobby")} style={{ backgroundColor: "transparent", color: "#71717a", fontWeight: "bold", fontSize: "14px", padding: "12px 24px", borderRadius: "99px", border: "1px solid #27272a", cursor: "pointer" }}>
           LEAVE ROOM

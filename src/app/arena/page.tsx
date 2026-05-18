@@ -73,7 +73,6 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
   const [liveMyScore, setLiveMyScore] = useState<number | null>(null);
   const [eloResult, setEloResult] = useState<{ newElo: number, change: number } | null>(null);
 
-  // NEW: Destructuring isDataConnected
   const { 
     localStream, remoteStream, isSearching, isConnected, isConnecting, isDataConnected,
     opponentScore, liveOpponentScore, remoteProfile, skip, sendTelemetry 
@@ -91,6 +90,17 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
 
   const { isLoaded, detect } = useFaceScanner({ enabled: true });
 
+  const phaseRef = useRef(battlePhase);
+  useEffect(() => {
+    phaseRef.current = battlePhase;
+  }, [battlePhase]);
+  
+  // FIX: Protect the telemetry function from stale closures
+  const telemetryRef = useRef(sendTelemetry);
+  useEffect(() => {
+    telemetryRef.current = sendTelemetry;
+  }, [sendTelemetry]);
+
   useEffect(() => {
     if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream;
   }, [localStream]);
@@ -99,25 +109,22 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
     if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
   }, [remoteStream]);
 
-  // FIX 1: Strict Sync - Wait for BOTH video and data channels
   useEffect(() => {
     if (isConnected && isDataConnected && battlePhase === "waiting") {
-      sendTelemetry("PROFILE_SYNC", { profile: localProfile });
+      telemetryRef.current("PROFILE_SYNC", { profile: localProfile });
       setBattlePhase("connected");
       setCountdown(5);
       trackEvent("battle_join");
       setTimeout(() => setBattlePhase("countdown"), 1000);
     }
-  }, [isConnected, isDataConnected, battlePhase, sendTelemetry, localProfile, trackEvent]);
+  }, [isConnected, isDataConnected, battlePhase, localProfile, trackEvent]);
 
-  // FIX 2: Decoupled End Logic - This runs exactly when countdown hits 0
   useEffect(() => {
     if (battlePhase === "countdown" && countdown === 0 && myScore === null) {
-      // Fallback to 0 if the scanner failed or they covered the camera
       const finalScore = liveMyScore !== null ? liveMyScore : 0; 
       
       setMyScore(finalScore);
-      sendTelemetry("FINAL_SCORE", { score: finalScore });
+      telemetryRef.current("FINAL_SCORE", { score: finalScore });
       setBattlePhase("result");
       trackEvent("battle_complete");
 
@@ -128,7 +135,6 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
       const { newElo, eloChange } = calculateEloUpdate(localProfile.elo, oppElo, isWinner);
       setEloResult({ newElo, change: eloChange });
 
-      // Save to database logic
       if (mode === "ranked" && localProfile.id) {
         supabase.rpc('update_post_match_stats', {
           p_user_id: localProfile.id,
@@ -166,24 +172,34 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
     }
   }, [countdown, battlePhase, myScore, liveMyScore, opponentScore, mode, localProfile, remoteProfile, supabase, trackEvent]);
 
-  const handleLocalVideoReady = () => {
+  // FIX: The loop is safely housed in useEffect. It will only start when isLoaded = true.
+  useEffect(() => {
+    if (!isLoaded || !localVideoRef.current || !localCanvasRef.current) return;
+
     const loop = () => {
-      if (localVideoRef.current && localCanvasRef.current && isLoaded) {
-        const video = localVideoRef.current;
-        const canvas = localCanvasRef.current;
+      const video = localVideoRef.current;
+      const canvas = localCanvasRef.current;
+      
+      if (video && canvas && video.readyState >= 2 && video.videoWidth > 0) {
+        canvas.width = video.clientWidth;
+        canvas.height = video.clientHeight;
+        const ctx = canvas.getContext("2d");
         
-        if (video.readyState >= 2 && video.videoWidth > 0) {
-          canvas.width = video.clientWidth;
-          canvas.height = video.clientHeight;
-          const result = detect(video);
-          const ctx = canvas.getContext("2d");
-          const timeMs = performance.now();
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
           
-          if (ctx) {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const scanY = ((timeMs % 3000) / 3000) * canvas.height;
-            ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(canvas.width, scanY);
-            ctx.strokeStyle = "rgba(57, 255, 20, 0.4)"; ctx.lineWidth = 1.5; ctx.stroke();
+          if (phaseRef.current === 'result') {
+            requestRef.current = requestAnimationFrame(loop);
+            return; 
+          }
+
+          const timeMs = performance.now();
+          const scanY = ((timeMs % 3000) / 3000) * canvas.height;
+          ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(canvas.width, scanY);
+          ctx.strokeStyle = "rgba(57, 255, 20, 0.4)"; ctx.lineWidth = 1.5; ctx.stroke();
+
+          try {
+            const result = detect(video);
 
             if (result?.faceLandmarks?.[0]) {
               const videoRatio = video.videoWidth / video.videoHeight;
@@ -214,27 +230,30 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
               ctx.fillStyle = "#39FF14";
               pts.forEach(pt => { ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI); ctx.fill(); });
 
-              if (battlePhase === "countdown") {
-                if (result.faceLandmarks && result.faceLandmarks.length > 0) {
-                  const rawScore = calculateMogScore(result.faceLandmarks[0] as any);
-                  const currentScore = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0;
+              if (phaseRef.current === "countdown") {
+                const rawScore = calculateMogScore(result.faceLandmarks[0] as any);
+                const currentScore = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0;
 
-                  // FIX 3: Removed end-game logic, only telemetry remains here
-                  if (timeMs - lastTelemetryTime.current > 150) {
-                    setLiveMyScore(currentScore); 
-                    sendTelemetry("LIVE_SCORE", { score: currentScore });
-                    lastTelemetryTime.current = timeMs;
-                  }
+                if (timeMs - lastTelemetryTime.current > 150) {
+                  setLiveMyScore(currentScore); 
+                  telemetryRef.current("LIVE_SCORE", { score: currentScore });
+                  lastTelemetryTime.current = timeMs;
                 }
               }
             }
+          } catch (err) {
+            console.warn("Scanner skipped frame due to error", err);
           }
         }
       }
       requestRef.current = requestAnimationFrame(loop);
     };
     requestRef.current = requestAnimationFrame(loop);
-  };
+
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    };
+  }, [isLoaded, detect]);
 
   useEffect(() => {
     if (battlePhase === "countdown" && countdown > 0) {
@@ -309,20 +328,21 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
               {mode === "ranked" && <div style={{ color: "#a1a1aa", fontSize: "10px", fontFamily: "monospace" }}>{getPrestigeRank(remoteProfile.elo || 1200)} • {remoteProfile.elo || 1200} ELO</div>}
             </div>
           )}
-          {liveOpponentScore && battlePhase === "countdown" && (
+          {liveOpponentScore !== null && battlePhase === "countdown" && (
             <div style={{ position: "absolute", bottom: 16, right: 16, zIndex: 20, color: "white", fontWeight: "900", fontSize: "4rem", opacity: 0.8 }}>{liveOpponentScore.toFixed(1)}</div>
           )}
         </div>
 
         {/* Bottom/Right: Local View */}
         <div className="relative flex-1 w-full md:w-1/2 h-1/2 md:h-full bg-black">
-          <video ref={localVideoRef} autoPlay playsInline muted onLoadedData={handleLocalVideoReady} style={{ position: "absolute", width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />
+          {/* FIX: onLoadedData has been removed. The useEffect handles initialization. */}
+          <video ref={localVideoRef} autoPlay playsInline muted style={{ position: "absolute", width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />
           <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 2, pointerEvents: "none", transform: "scaleX(-1)" }} />
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
             <div style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{localProfile.name}</div>
             {mode === "ranked" && <div style={{ color: "#a1a1aa", fontSize: "10px", fontFamily: "monospace" }}>{getPrestigeRank(localProfile.elo || 1200)} • {localProfile.elo || 1200} ELO</div>}
           </div>
-          {liveMyScore && battlePhase === "countdown" && (
+          {liveMyScore !== null && battlePhase === "countdown" && (
             <div style={{ position: "absolute", bottom: 16, right: 16, zIndex: 20, color: "white", fontWeight: "900", fontSize: "4rem", opacity: 0.8 }}>{liveMyScore.toFixed(1)}</div>
           )}
           {battlePhase === "countdown" && countdown > 0 && (
