@@ -7,6 +7,8 @@ import { calculateMogScore } from "@/utils/faceMath";
 import { calculateEloUpdate, getPrestigeRank } from "@/utils/eloMath";
 import { createClient } from "@/lib/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import ShareCard from "@/components/ShareCard";
+import { toPng } from "html-to-image";
 
 const SLEEK_INDICES = [10, 152, 234, 454, 132, 361, 33, 263, 4, 61, 291];
 
@@ -63,16 +65,19 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
   const localCanvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number | undefined>(undefined);
   const lastTelemetryTime = useRef(0);
+  const cardRef = useRef<HTMLDivElement>(null);
   
   const [battlePhase, setBattlePhase] = useState<"waiting" | "connected" | "countdown" | "result">("waiting");
   const [countdown, setCountdown] = useState(5);
   const [myScore, setMyScore] = useState<number | null>(null);
   const [liveMyScore, setLiveMyScore] = useState<number | null>(null);
   const [eloResult, setEloResult] = useState<{ newElo: number, change: number } | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
 
   const { 
     localStream, remoteStream, isSearching, isConnected, isConnecting, isDataConnected,
-    opponentScore, liveOpponentScore, remoteProfile, skip, sendTelemetry 
+    opponentScore, liveOpponentScore, remoteProfile, skip, sendTelemetry,
+    rematchState, requestRematch, acceptRematch 
   } = useMatchmaker({
     mode: mode,
     playerElo: localProfile.elo,
@@ -82,8 +87,58 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
       setLiveMyScore(null);
       setEloResult(null);
       setCountdown(5);
+    },
+    onRematch: () => {
+      setMyScore(null);
+      setLiveMyScore(null);
+      setEloResult(null);
+      setCountdown(5);
+      setBattlePhase("countdown");
     }
   });
+
+  const handleDownloadCard = async () => {
+    if (!cardRef.current) return;
+    try {
+      const dataUrl = await toPng(cardRef.current, { quality: 1.0, pixelRatio: 1, cacheBust: true });
+      const link = document.createElement('a');
+      link.download = `omoggle-victory-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Failed to generate card', err);
+      alert('Could not generate image. Please try again.');
+    }
+  };
+
+  const handleNativeShare = async () => {
+    if (!cardRef.current) return;
+    setIsSharing(true);
+    try {
+      const dataUrl = await toPng(cardRef.current, { quality: 0.9, pixelRatio: 1, skipAutoScale: true, cacheBust: true });
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], "mog-victory.png", { type: "image/png" });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: 'Mog Battle Result',
+          text: 'I just faced the scanner. Do you have the genetics to beat my score?',
+          files: [file]
+        });
+      } else {
+        const link = document.createElement('a');
+        link.download = `omoggle-victory-${Date.now()}.png`;
+        link.href = dataUrl;
+        link.click();
+      }
+    } catch (err) {
+      console.error("Share failed:", err);
+      alert("Could not generate image. Your browser might be blocking it.");
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   const { isLoaded, detect } = useFaceScanner({ enabled: true });
 
@@ -288,7 +343,7 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
     <div style={{ display: "flex", flexDirection: "column", height: "100dvh", width: "100vw", backgroundColor: "#09090b", overflow: "hidden", position: "relative" }}>
       
       {battlePhase === "result" && verdict && (
-        <div style={{ position: "absolute", inset: 0, zIndex: 100, backgroundColor: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 120, backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           
           {mode === "ranked" && eloResult && (
             <div style={{ backgroundColor: "rgba(0,0,0,0.8)", border: "1px solid #27272a", padding: "10px 30px", borderRadius: "99px", marginBottom: "20px", display: "flex", alignItems: "center", gap: "10px" }}>
@@ -299,10 +354,10 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
             </div>
           )}
 
-          <h1 style={{ fontSize: "5.5rem", fontWeight: 900, color: verdict.color, textShadow: `0 0 30px ${verdict.color}80`, margin: 0 }}>{verdict.title}</h1>
+          <h1 style={{ fontSize: "5.5rem", fontWeight: 900, color: verdict.color, textShadow: `0 0 30px ${verdict.color}80`, margin: 0, textAlign: "center", lineHeight: 1.1 }}>{verdict.title}</h1>
           <div style={{ color: "white", fontWeight: "bold", letterSpacing: "5px", marginBottom: "30px", opacity: 0.9 }}>{verdict.sub}</div>
           
-          <div style={{ display: "flex", gap: "4rem", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "4rem", alignItems: "center", marginBottom: "40px" }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ color: "#a1a1aa", fontSize: "12px", marginBottom: "5px", fontFamily: "monospace" }}>OPPONENT</div>
               <div style={{ fontSize: "3.5rem", fontWeight: 900, color: "white" }}>{opponentScore?.toFixed(1)}</div>
@@ -312,6 +367,54 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
               <div style={{ color: "#a1a1aa", fontSize: "12px", marginBottom: "5px", fontFamily: "monospace" }}>YOU</div>
               <div style={{ fontSize: "3.5rem", fontWeight: 900, color: verdict.color }}>{myScore?.toFixed(1)}</div>
             </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "20px", marginBottom: "20px" }}>
+            <button onClick={handleDownloadCard} style={{ padding: "12px 24px", backgroundColor: "white", color: "black", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>DOWNLOAD</button>
+            <button 
+              onClick={handleNativeShare} 
+              disabled={isSharing}
+              style={{ 
+                padding: "12px 24px", 
+                backgroundColor: "#a855f7", 
+                color: "white", 
+                border: "none", 
+                borderRadius: "8px", 
+                fontWeight: "bold", 
+                cursor: isSharing ? "not-allowed" : "pointer", 
+                fontSize: "14px",
+                opacity: isSharing ? 0.5 : 1,
+                display: "flex",
+                alignItems: "center",
+                gap: "8px"
+              }}
+            >
+              {isSharing ? (
+                <>
+                  <div style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%", animation: "spin 0.6s linear infinite" }}></div>
+                  PREPARING...
+                </>
+              ) : "SHARE RESULT"}
+            </button>
+          </div>
+
+          <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
+            {rematchState === 'idle' && (
+              <button onClick={requestRematch} style={{ padding: "15px 30px", backgroundColor: "#22c55e", color: "white", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" }}>DEMAND REMATCH</button>
+            )}
+
+            {rematchState === 'requested_by_me' && (
+              <div style={{ color: "#22c55e", fontWeight: "bold", animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite" }}>WAITING FOR OPPONENT...</div>
+            )}
+
+            {rematchState === 'requested_by_opponent' && (
+              <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
+                <span style={{ color: "#fbbf24", fontWeight: "bold" }}>OPPONENT WANTS A REMATCH!</span>
+                <button onClick={acceptRematch} style={{ padding: "12px 24px", backgroundColor: "#fbbf24", color: "black", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>ACCEPT</button>
+              </div>
+            )}
+            
+            <button onClick={() => router.push("/lobby")} style={{ padding: "15px 30px", backgroundColor: "transparent", color: "white", border: "1px solid #27272a", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "16px" }}>LEAVE</button>
           </div>
         </div>
       )}
@@ -377,6 +480,19 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
         <button onClick={() => window.location.reload()} style={{ backgroundColor: "#ef4444", color: "white", fontWeight: "900", fontSize: "18px", padding: "12px 48px", borderRadius: "99px", border: "none", cursor: "pointer" }}>
           {battlePhase === "result" ? "NEXT BATTLE" : "SKIP"}
         </button>
+      </div>
+
+      <div style={{ position: "absolute", left: "-9999px", top: 0 }}>
+        <div ref={cardRef}>
+          <ShareCard 
+            playerName={localProfile.name}
+            opponentName={remoteProfile?.name}
+            winRate={85}
+            score={myScore || 0}
+            elo={localProfile.elo}
+            challengeLink={typeof window !== 'undefined' ? window.location.href : ''}
+          />
+        </div>
       </div>
     </div>
   );
@@ -444,6 +560,52 @@ function ArenaDataLoader() {
     return (
       <div style={{ minHeight: "100vh", backgroundColor: "#09090b", color: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "monospace", letterSpacing: "2px" }}>
         INITIALIZING SECURE UPLINK...
+      </div>
+    );
+  }
+
+  if (mode === "ranked" && localProfile.id === null) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: "#050505", color: "white", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif", padding: "20px", textAlign: "center" }}>
+        <div style={{ width: "100%", maxWidth: "440px", backgroundColor: "#0a0a0c", border: "1px solid #ef444430", borderRadius: "24px", padding: "40px 30px", boxShadow: "0 0 40px rgba(0,0,0,0.8)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", marginBottom: "15px" }}>
+            <span style={{ fontSize: "2rem", fontWeight: "900", color: "#fbbf24" }}>🏆</span>
+          </div>
+          <h2 style={{ fontSize: "1.8rem", fontWeight: "900", color: "white", margin: "0 0 10px 0", letterSpacing: "1px" }}>REGISTRATION REQUIRED</h2>
+          <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.6", marginBottom: "30px" }}>
+            Ranked matchmaking requires a persistent ELO profile and rank ranking history to track your genetic ascendancy. Guests can only play in the Casual Arena.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <button
+              onClick={async () => {
+                await supabase.auth.signInWithOAuth({
+                  provider: 'google',
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback`
+                  }
+                });
+              }}
+              style={{
+                width: "100%", padding: "16px", backgroundColor: "#ef4444", color: "white",
+                border: "none", borderRadius: "12px", cursor: "pointer",
+                fontWeight: "900", fontSize: "15px", transition: "all 0.2s",
+                boxShadow: "0 0 20px rgba(239, 68, 68, 0.3)"
+              }}
+            >
+              SIGN UP WITH GOOGLE
+            </button>
+            <button
+              onClick={() => window.location.href = "/lobby"}
+              style={{
+                width: "100%", padding: "14px", backgroundColor: "transparent", color: "#71717a",
+                border: "1px solid #27272a", borderRadius: "12px", cursor: "pointer",
+                fontWeight: "bold", fontSize: "14px", transition: "all 0.2s"
+              }}
+            >
+              RETURN TO LOBBY
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

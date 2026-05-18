@@ -42,6 +42,10 @@ export default function Lobby() {
   const [joinCode, setJoinCode] = useState("");
   const [codeCopied, setCodeCopied] = useState(false);
 
+  // Guest Registration Modal States
+  const [isAuthRequiredModalOpen, setIsAuthRequiredModalOpen] = useState(false);
+  const [authModalReason, setAuthModalReason] = useState<"ranked" | "private">("ranked");
+
   const generateRoomCode = () => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let code = "";
@@ -62,6 +66,15 @@ export default function Lobby() {
     if (code.trim().length >= 4) {
       router.push(`/arena/private?room=${code.trim().toUpperCase()}`);
     }
+  };
+
+  const handleGoogleLogin = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
+    });
   };
 
   // Fetch initial data
@@ -240,7 +253,14 @@ export default function Lobby() {
                   color="#fbbf24" 
                   active 
                   className="mode-card"
-                  onClick={() => router.push("/arena?mode=ranked")}
+                  onClick={() => {
+                    if (!currentUserId) {
+                      setAuthModalReason("ranked");
+                      setIsAuthRequiredModalOpen(true);
+                    } else {
+                      router.push("/arena?mode=ranked");
+                    }
+                  }}
                 />
                 <ModeCard 
                   icon={<ShieldCheck/>} 
@@ -249,7 +269,15 @@ export default function Lobby() {
                   desc="Create or join a private battle room with a custom code." 
                   color="#22c55e" 
                   active
-                  onClick={() => { setIsPrivateModalOpen(true); generateRoomCode(); }}
+                  onClick={() => {
+                    if (!currentUserId) {
+                      setAuthModalReason("private");
+                      setIsAuthRequiredModalOpen(true);
+                    } else {
+                      setIsPrivateModalOpen(true);
+                      generateRoomCode();
+                    }
+                  }}
                 />
               </div>
             ) : (
@@ -362,6 +390,68 @@ export default function Lobby() {
           </aside>
         </div>
       </div>
+
+      {/* ─── REGISTRATION REQUIRED MODAL ─── */}
+      {isAuthRequiredModalOpen && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 210, backdropFilter: "blur(8px)", padding: "20px" }}>
+          <div style={{ width: "100%", maxWidth: "440px", backgroundColor: "#0a0a0c", border: "1px solid #ef444430", borderRadius: "24px", padding: "40px 30px", position: "relative", textAlign: "center" }}>
+            
+            {/* Close Button */}
+            <button onClick={() => setIsAuthRequiredModalOpen(false)} style={{ position: "absolute", top: "20px", right: "20px", background: "none", border: "none", color: "#71717a", cursor: "pointer" }}>
+              <X size={24} />
+            </button>
+
+            {/* Header Icon */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", marginBottom: "15px" }}>
+              <Trophy size={32} color="#fbbf24" style={{ filter: "drop-shadow(0 0 8px rgba(251, 191, 36, 0.4))" }} />
+            </div>
+
+            {/* Header */}
+            <h2 style={{ fontSize: "1.6rem", fontWeight: "900", color: "white", margin: "0 0 10px 0", letterSpacing: "1px" }}>
+              REGISTRATION REQUIRED
+            </h2>
+            
+            <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.6", marginBottom: "30px" }}>
+              {authModalReason === "ranked" 
+                ? "Ranked matchmaking requires a persistent ELO profile and rank ranking history to track your genetic ascendancy. Guests can only play in the Casual Arena."
+                : "Private rooms require a verified player signature to authenticate secure connections. Guests can only play in the Casual Arena."
+              }
+            </p>
+
+            {/* Action Buttons */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <button
+                onClick={handleGoogleLogin}
+                style={{
+                  width: "100%", padding: "16px", backgroundColor: "#ef4444", color: "white",
+                  border: "none", borderRadius: "12px", cursor: "pointer",
+                  fontWeight: "900", fontSize: "15px", transition: "all 0.2s",
+                  boxShadow: "0 0 20px rgba(239, 68, 68, 0.3)"
+                }}
+              >
+                SIGN UP WITH GOOGLE
+              </button>
+              
+              <button
+                onClick={() => setIsAuthRequiredModalOpen(false)}
+                style={{
+                  width: "100%", padding: "14px", backgroundColor: "transparent", color: "#71717a",
+                  border: "1px solid #27272a", borderRadius: "12px", cursor: "pointer",
+                  fontWeight: "bold", fontSize: "14px", transition: "all 0.2s"
+                }}
+              >
+                KEEP PLAYING CASUAL
+              </button>
+            </div>
+
+            {/* Footer notice */}
+            <p style={{ fontSize: "10px", color: "#52525b", marginTop: "20px", margin: "20px 0 0 0" }}>
+              Signing up takes 3 seconds and is completely free.
+            </p>
+
+          </div>
+        </div>
+      )}
 
       {/* ─── PRIVATE ROOM MODAL ─── */}
       {isPrivateModalOpen && (

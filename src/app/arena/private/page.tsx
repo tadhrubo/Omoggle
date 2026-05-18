@@ -635,6 +635,52 @@ function PrivateArenaDataLoader() {
     );
   }
 
+  if (localProfile.id === null) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: "#050505", color: "white", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif", padding: "20px", textAlign: "center" }}>
+        <div style={{ width: "100%", maxWidth: "440px", backgroundColor: "#0a0a0c", border: "1px solid #ef444430", borderRadius: "24px", padding: "40px 30px", boxShadow: "0 0 40px rgba(0,0,0,0.8)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", marginBottom: "15px" }}>
+            <span style={{ fontSize: "2rem", fontWeight: "900", color: "#fbbf24" }}>🔒</span>
+          </div>
+          <h2 style={{ fontSize: "1.8rem", fontWeight: "900", color: "white", margin: "0 0 10px 0", letterSpacing: "1px" }}>REGISTRATION REQUIRED</h2>
+          <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.6", marginBottom: "30px" }}>
+            Private rooms require a verified player signature to authenticate secure connections. Guests can only play in the Casual Arena.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <button
+              onClick={async () => {
+                await supabase.auth.signInWithOAuth({
+                  provider: 'google',
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback`
+                  }
+                });
+              }}
+              style={{
+                width: "100%", padding: "16px", backgroundColor: "#ef4444", color: "white",
+                border: "none", borderRadius: "12px", cursor: "pointer",
+                fontWeight: "900", fontSize: "15px", transition: "all 0.2s",
+                boxShadow: "0 0 20px rgba(239, 68, 68, 0.3)"
+              }}
+            >
+              SIGN UP WITH GOOGLE
+            </button>
+            <button
+              onClick={() => window.location.href = "/lobby"}
+              style={{
+                width: "100%", padding: "14px", backgroundColor: "transparent", color: "#71717a",
+                border: "1px solid #27272a", borderRadius: "12px", cursor: "pointer",
+                fontWeight: "bold", fontSize: "14px", transition: "all 0.2s"
+              }}
+            >
+              RETURN TO LOBBY
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return <PrivateArenaCore roomCode={roomCode.toUpperCase()} localProfile={localProfile} />;
 }
 
