@@ -11,7 +11,6 @@ import { toPng } from "html-to-image";
 
 const SLEEK_INDICES = [10, 152, 234, 454, 132, 361, 33, 263, 4, 61, 291];
 
-// Simple audio synthesis for tick and victory/defeat
 const playTickSound = () => {
   const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
   const osc = ctx.createOscillator();
@@ -52,10 +51,9 @@ const getMatchVerdict = (localScore: number, remoteScore: number) => {
   if (delta === 0) {
     resultTitle = "STALEMATE";
     resultSubtitle = "EQUAL LOOKSMAXXING";
-    titleColor = "#fbbf24"; // Yellow
+    titleColor = "#fbbf24"; 
   } else if (delta > 0) {
-    // --- VICTORY TIERS ---
-    titleColor = "#22c55e"; // Green
+    titleColor = "#22c55e"; 
     if (absDelta <= 0.5) {
       resultTitle = "NARROW MOG";
       resultSubtitle = "IT WAS CLOSE, BUT YOU SURVIVED";
@@ -67,8 +65,7 @@ const getMatchVerdict = (localScore: number, remoteScore: number) => {
       resultSubtitle = "ABSOLUTE GENETIC DOMINANCE";
     }
   } else {
-    // --- DEFEAT TIERS ---
-    titleColor = "#ef4444"; // Red
+    titleColor = "#ef4444"; 
     if (absDelta <= 0.5) {
       resultTitle = "BARELY MOGGED";
       resultSubtitle = "A MARGINAL DEFEAT";
@@ -103,16 +100,18 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const handleDownloadCard = async () => {
     if (!cardRef.current) return;
     try {
-      const dataUrl = await toPng(cardRef.current, { 
-        quality: 1.0,
-        pixelRatio: 1 
-      });
+      // FIX: Add watchdog to foreground download as well
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000));
+      const renderPromise = toPng(cardRef.current, { quality: 1.0, pixelRatio: 1, fetchRequestInit: { cache: 'no-cache' } });
+      const dataUrl = await Promise.race([renderPromise, timeout]);
+      
       const link = document.createElement('a');
       link.download = `omoggle-victory-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
     } catch (err) {
       console.error('Failed to generate card', err);
+      alert('Could not generate image. Please try again.');
     }
   };
 
@@ -128,7 +127,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         console.log('User cancelled share or share failed', err);
       }
     } else {
-      // Fallback if preloading isn't done yet or desktop doesn't support sharing
       handleDownloadCard(); 
     }
   };
@@ -139,7 +137,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
     setLiveMyScore(null);
     setTimer(5);
     setPhase('PREP');
-    setPreloadedShareFile(null); // Reset share file for next round
+    setPreloadedShareFile(null); 
   };
 
   type Phase = 'WAITING' | 'PREP' | 'BATTLE' | 'SCORING' | 'RESULT';
@@ -150,31 +148,37 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
     phaseRef.current = phase;
   }, [phase]);
 
-  // Background Pre-render for Share Card - FIXED STATE LOCK
+  // Background Pre-render with Watchdog Timer
   useEffect(() => {
     if (phase === 'RESULT' && !preloadedShareFile && !isPreloading) {
       setIsPreloading(true);
       
-      // Give the DOM 500ms to fully paint the hidden share card before capturing
       setTimeout(async () => {
         if (!cardRef.current) {
-          setIsPreloading(false); // FIX: Reset state if ref is missing
+          setIsPreloading(false); 
           return;
         }
         try {
-          const dataUrl = await toPng(cardRef.current, { 
+          // FIX 1: Watchdog Timer. If html-to-image hangs for 2.5 seconds, we kill it to unstick the button.
+          const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Render timeout")), 2500));
+          
+          const renderPromise = toPng(cardRef.current, { 
             quality: 0.9, 
             pixelRatio: 1,
-            skipAutoScale: true // FIX: Helps prevent mobile rendering hangs
+            skipAutoScale: true,
+            fetchRequestInit: { cache: 'no-cache' } // Helps bypass aggressive CORS caching
           });
+
+          const dataUrl = await Promise.race([renderPromise, timeout]);
           const res = await fetch(dataUrl);
           const blob = await res.blob();
           const file = new File([blob], "mog-victory.png", { type: "image/png" });
           setPreloadedShareFile(file);
         } catch (err) {
-          console.error("Background pre-render failed", err);
+          console.warn("Background pre-render timed out or failed:", err);
+          // If it fails, we just silently fail and let the user try the manual download button
         } finally {
-          setIsPreloading(false);
+          setIsPreloading(false); // GUARANTEED to unstick the button
         }
       }, 500); 
     }
@@ -229,15 +233,23 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         if (video.readyState >= 2 && video.videoWidth > 0) {
           canvas.width = video.clientWidth;
           canvas.height = video.clientHeight;
-          const result = detect(video);
           const ctx = canvas.getContext("2d");
-          const timeMs = performance.now();
 
           if (ctx) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // FIX 2: Stop drawing the mesh and laser if the battle is over
+            if (phaseRef.current === 'SCORING' || phaseRef.current === 'RESULT') {
+              requestRef.current = requestAnimationFrame(loop);
+              return; 
+            }
+
+            const timeMs = performance.now();
             const scanY = ((timeMs % 3000) / 3000) * canvas.height;
             ctx.beginPath(); ctx.moveTo(0, scanY); ctx.lineTo(canvas.width, scanY);
             ctx.strokeStyle = "rgba(57, 255, 20, 0.4)"; ctx.lineWidth = 1.5; ctx.stroke();
+
+            const result = detect(video);
 
             if (result?.faceLandmarks?.[0]) {
               const videoRatio = video.videoWidth / video.videoHeight;
@@ -320,12 +332,10 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   useEffect(() => {
     if (phase === 'SCORING') {
       const scores = scoreHistoryRef.current;
-
       let finalScore = 4.5; 
       if (scores.length > 0) {
         finalScore = Math.max(...scores);
       }
-      
       finalScore = parseFloat(finalScore.toFixed(1));
       setMyScore(finalScore);
 
@@ -431,8 +441,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         </div>
       )}
 
-      {/* Hidden Share Card for Capture - FIXED CSS */}
-      <div style={{ position: "absolute", left: 0, top: 0, zIndex: -50, opacity: 0.01, pointerEvents: "none" }}>
+      {/* Hidden Share Card for Capture - Using fixed off-screen placement to avoid Safari Paint issues */}
+      <div style={{ position: "fixed", left: "-10000px", top: "-10000px", width: "1200px", height: "630px", pointerEvents: "none" }}>
         <div ref={cardRef}>
           <ShareCard 
             playerName={localProfile.name}
