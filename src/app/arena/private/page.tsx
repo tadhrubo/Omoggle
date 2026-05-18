@@ -178,7 +178,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
 
   const { isLoaded, detect } = useFaceScanner({ enabled: true });
   
-  // FIX: Protect the telemetry function from stale closures
   const telemetryRef = useRef(sendTelemetry);
   useEffect(() => {
     telemetryRef.current = sendTelemetry;
@@ -286,7 +285,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
-  }, [isLoaded, detect]); // Cleanly triggers the exact moment the AI model mounts
+  }, [isLoaded, detect]); 
 
   useEffect(() => {
     if (phase === 'WAITING' || phase === 'SCORING' || phase === 'RESULT') return;
@@ -489,7 +488,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         </div>
 
         <div className="video-box" style={{ borderTop: "2px solid #27272a" }}>
-          {/* FIX: onLoadedData completely removed here so the trap can't happen */}
+          {/* FIX: onLoadedData completely removed here to prevent closure trap */}
           <video ref={localVideoRef} autoPlay playsInline muted className="video-element" style={{ transform: "scaleX(-1)", position: "relative", zIndex: 10 }} />
           <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 15, pointerEvents: "none", transform: "scaleX(-1)" }} />
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
@@ -553,9 +552,6 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   );
 }
 
-// ============================================================================
-// DATA LOADER
-// ============================================================================
 function PrivateArenaDataLoader() {
   const searchParams = useSearchParams();
   const roomCode = searchParams.get("room") || "";
@@ -628,9 +624,6 @@ function PrivateArenaDataLoader() {
   return <PrivateArenaCore roomCode={roomCode.toUpperCase()} localProfile={localProfile} />;
 }
 
-// ============================================================================
-// SAFE SUSPENSE WRAPPER
-// ============================================================================
 export default function PrivateArena() {
   return (
     <Suspense fallback={<div style={{ minHeight: "100vh", backgroundColor: "#09090b" }} />}>

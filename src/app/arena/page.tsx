@@ -54,9 +54,6 @@ const getMatchVerdict = (myScore: number, oppScore: number) => {
   }
 };
 
-// ============================================================================
-// 1. CORE BATTLE COMPONENT
-// ============================================================================
 function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localProfile: any }) {
   const router = useRouter();
   const supabase = createClient();
@@ -95,7 +92,6 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
     phaseRef.current = battlePhase;
   }, [battlePhase]);
   
-  // FIX: Protect the telemetry function from stale closures
   const telemetryRef = useRef(sendTelemetry);
   useEffect(() => {
     telemetryRef.current = sendTelemetry;
@@ -272,7 +268,6 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
       {battlePhase === "result" && verdict && (
         <div style={{ position: "absolute", inset: 0, zIndex: 100, backgroundColor: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           
-          {/* ELO Pop-up (Dynamic for Ranked Only) */}
           {mode === "ranked" && eloResult && (
             <div style={{ backgroundColor: "rgba(0,0,0,0.8)", border: "1px solid #27272a", padding: "10px 30px", borderRadius: "99px", marginBottom: "20px", display: "flex", alignItems: "center", gap: "10px" }}>
               <span style={{ color: "white", fontFamily: "monospace", fontSize: "12px" }}>RANK RATING</span>
@@ -335,7 +330,7 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
 
         {/* Bottom/Right: Local View */}
         <div className="relative flex-1 w-full md:w-1/2 h-1/2 md:h-full bg-black">
-          {/* FIX: onLoadedData has been removed. The useEffect handles initialization. */}
+          {/* FIX: onLoadedData completely removed here to prevent closure trap */}
           <video ref={localVideoRef} autoPlay playsInline muted style={{ position: "absolute", width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} />
           <canvas ref={localCanvasRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 2, pointerEvents: "none", transform: "scaleX(-1)" }} />
           <div style={{ position: "absolute", top: 16, left: 16, zIndex: 20, background: "rgba(0,0,0,0.6)", padding: "10px", borderRadius: "8px", border: "1px solid #27272a" }}>
@@ -442,9 +437,6 @@ function ArenaDataLoader() {
   return <ArenaCore mode={mode} localProfile={localProfile} />;
 }
 
-// ============================================================================
-// 3. SAFE SUSPENSE WRAPPER
-// ============================================================================
 export default function Arena() {
   return (
     <Suspense fallback={<div style={{ minHeight: "100vh", backgroundColor: "#09090b" }} />}>
