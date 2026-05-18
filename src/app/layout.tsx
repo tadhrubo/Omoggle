@@ -293,6 +293,16 @@ export default function RootLayout({
             </Script>
           </>
         )}
+
+        {/* --- Google AdSense Setup --- */}
+        {process.env.NODE_ENV === "production" && (
+          <Script
+            id="adsbygoogle-init"
+            strategy="afterInteractive"
+            crossOrigin="anonymous"
+            src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3979167601320086"
+          />
+        )}
       </body>
     </html>
   );
