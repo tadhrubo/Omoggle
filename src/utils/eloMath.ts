@@ -23,16 +23,33 @@ export function calculateEloUpdate(myElo: number, opponentElo: number, isWinner:
   return { newElo, eloChange };
 }
 
+export interface RankGroup {
+  name: string;
+  minElo: number;
+  color: string;
+  glow: string;
+  bg: string;
+  border: string;
+}
+
+export const RANK_GROUPS: RankGroup[] = [
+  { name: "TRUE ADAM", minElo: 2500, color: "#ffffff", glow: "0 0 20px #fff", bg: "linear-gradient(135deg, #09090b 0%, #1e1b4b 50%, #311042 100%)", border: "#ffffff" },
+  { name: "TERRACHAD", minElo: 2200, color: "#fbbf24", glow: "0 0 15px #fbbf24", bg: "linear-gradient(135deg, #09090b 0%, #78350f 50%, #451a03 100%)", border: "#fbbf24" },
+  { name: "CHAD", minElo: 1900, color: "#ef4444", glow: "0 0 10px #ef4444", bg: "linear-gradient(135deg, #09090b 0%, #7f1d1d 50%, #450a0a 100%)", border: "#ef4444" },
+  { name: "CHADLITE", minElo: 1600, color: "#c084fc", glow: "0 0 8px #c084fc", bg: "linear-gradient(135deg, #09090b 0%, #581c87 100%)", border: "#c084fc" },
+  { name: "HTN", minElo: 1300, color: "#3b82f6", glow: "none", bg: "linear-gradient(135deg, #09090b 0%, #1e3a8a 100%)", border: "#3b82f6" },
+  { name: "MTN", minElo: 1000, color: "#22c55e", glow: "none", bg: "linear-gradient(135deg, #09090b 0%, #064e3b 100%)", border: "#22c55e" },
+  { name: "LTN", minElo: 750, color: "#60a5fa", glow: "none", bg: "linear-gradient(135deg, #09090b 0%, #172554 100%)", border: "#60a5fa" },
+  { name: "SUB5", minElo: 500, color: "#9ca3af", glow: "none", bg: "linear-gradient(135deg, #09090b 0%, #374151 100%)", border: "#9ca3af" },
+  { name: "NPC", minElo: 250, color: "#6b7280", glow: "none", bg: "linear-gradient(135deg, #09090b 0%, #1f2937 100%)", border: "#6b7280" },
+  { name: "DOOMER", minElo: 0, color: "#4b5563", glow: "none", bg: "linear-gradient(135deg, #050505 0%, #111827 100%)", border: "#4b5563" },
+];
+
 // Custom Prestige Hierarchy Mapping based on ELO
+export function getPrestigeRankInfo(elo: number): RankGroup {
+  return RANK_GROUPS.find(r => elo >= r.minElo) || RANK_GROUPS[RANK_GROUPS.length - 1];
+}
+
 export function getPrestigeRank(elo: number): string {
-  if (elo >= 2500) return "TRUE ADAM";
-  if (elo >= 2200) return "TERRACHAD";
-  if (elo >= 1900) return "CHAD";
-  if (elo >= 1600) return "CHADLITE";
-  if (elo >= 1300) return "HTN";
-  if (elo >= 1000) return "MTN";
-  if (elo >= 750) return "LTN";
-  if (elo >= 500) return "SUB5";
-  if (elo >= 250) return "NPC";
-  return "DOOMER";
+  return getPrestigeRankInfo(elo).name;
 }

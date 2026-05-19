@@ -5,12 +5,17 @@ import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import { Flame, Trophy, Skull, Eye, Swords, Crown, ArrowLeft, Target } from "lucide-react";
 
+import { getPrestigeRankInfo } from "@/utils/eloMath";
+
 const getTier = (elo: number) => {
-  if (elo >= 2000) return { label: "MOG (Top 1%)", color: "#ffffff", glow: "0 0 20px #fff" };
-  if (elo >= 1600) return { label: "CHAD / STACY", color: "#fbbf24", glow: "0 0 15px #fbbf24" };
-  if (elo >= 1200) return { label: "HIGH-TIER NORMIE", color: "#a855f7", glow: "none" };
-  if (elo >= 800) return { label: "MID-TIER NORMIE", color: "#3b82f6", glow: "none" };
-  return { label: "SUB-RATED", color: "#ef4444", glow: "none" };
+  const info = getPrestigeRankInfo(elo);
+  return {
+    label: info.name,
+    color: info.color,
+    glow: info.glow,
+    bg: info.bg,
+    border: info.border
+  };
 };
 
 export default function ProfilePage() {

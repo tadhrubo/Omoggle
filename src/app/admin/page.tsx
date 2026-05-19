@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import AdminDashboardClient from "./AdminDashboardClient";
 import AdminLogin from "./AdminLogin";
+import { getPrestigeRank } from "@/utils/eloMath";
 
 export const dynamic = "force-dynamic";
 
@@ -64,11 +65,12 @@ export default async function AdminDashboard() {
     created_at: e.created_at,
   }));
 
+
   const safeProfiles = (profilesResult.data || []).map((p: any) => ({
     id: p.id,
     username: p.username || "Anonymous Player",
     elo: p.elo || 1200,
-    tier: p.tier || "MTN",
+    tier: getPrestigeRank(p.elo || 1200),
     wins: p.wins || 0,
     matches_played: p.matches_played || 0,
     current_streak: p.current_streak || 0,

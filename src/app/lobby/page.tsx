@@ -4,22 +4,10 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Swords, Trophy, BarChart3, ShieldCheck, Star, MessageCircle, Send, X, Copy, Check } from "lucide-react";
 
-/**
- * PRESTIGE HIERARCHY CONSTANTS
- * Synced with Home and Global Logic
- */
-const RANK_GROUPS = [
-  { name: "TRUE ADAM", minElo: 2500, color: "#ffffff", glow: "0 0 20px #fff" },
-  { name: "TERRACHAD", minElo: 2200, color: "#fbbf24", glow: "0 0 15px #fbbf24" },
-  { name: "CHAD", minElo: 1900, color: "#ef4444", glow: "0 0 10px #ef4444" },
-  { name: "CHADLITE", minElo: 1600, color: "#a855f7", glow: "none" },
-  { name: "HTN", minElo: 1300, color: "#3b82f6", glow: "none" },
-  { name: "MTN", minElo: 1000, color: "#22c55e", glow: "none" },
-  { name: "LTN", minElo: 0, color: "#71717a", glow: "none" },
-];
+import { RANK_GROUPS, getPrestigeRankInfo } from "@/utils/eloMath";
 
 const getRankStyle = (tierName: string) => {
-  return RANK_GROUPS.find(r => r.name === tierName) || RANK_GROUPS[6];
+  return RANK_GROUPS.find(r => r.name === tierName) || RANK_GROUPS[RANK_GROUPS.length - 1];
 };
 
 export default function Lobby() {
@@ -94,13 +82,13 @@ export default function Lobby() {
         setCurrentUserId(session.user.id);
         const { data: profile } = await supabase
             .from('profiles')
-            .select('username, tier')
+            .select('username, elo')
             .eq('id', session.user.id)
             .single();
         
         if (profile) {
           setCurrentUsername(profile.username || "Mogger");
-          setCurrentTier(profile.tier || "LTN");
+          setCurrentTier(getPrestigeRankInfo(profile.elo || 1200).name);
         }
 
         const { data: matches } = await supabase
@@ -284,7 +272,7 @@ export default function Lobby() {
               <div style={{ backgroundColor: "rgba(24, 24, 27, 0.5)", borderRadius: "16px", padding: "30px", border: "1px solid #18181b", backdropFilter: "blur(10px)" }}>
                 <h2 style={{ fontSize: "11px", color: "#71717a", letterSpacing: "4px", marginBottom: "30px", textTransform: "uppercase" }}>Global Hall of Fame</h2>
                 {leaderboard.map((user, i) => {
-                   const rank = getRankStyle(user.tier);
+                   const rank = getPrestigeRankInfo(user.elo || 1200);
                    return (
                     <div key={user.id} onClick={() => router.push(`/profile/${user.id}`)} style={{ display: "flex", justifyContent: "space-between", padding: "15px 0", borderBottom: "1px solid rgba(255,255,255,0.03)", cursor: "pointer", transition: "opacity 0.2s" }}
                       onMouseOver={(e) => e.currentTarget.style.opacity = "0.7"}
@@ -295,7 +283,7 @@ export default function Lobby() {
                         <span style={{ fontWeight: "bold", fontSize: "16px" }}>{user.username}</span>
                       </div>
                       <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
-                        <span style={{ fontSize: "10px", color: rank.color, textShadow: rank.glow, fontWeight: "900", background: "rgba(255,255,255,0.05)", padding: "4px 10px", borderRadius: "4px" }}>{user.tier}</span>
+                        <span style={{ fontSize: "10px", color: rank.color, textShadow: rank.glow, fontWeight: "900", background: "rgba(255,255,255,0.05)", padding: "4px 10px", borderRadius: "4px" }}>{rank.name}</span>
                         <span style={{ color: "white", fontWeight: "900", width: "50px", textAlign: "right" }}>{user.elo}</span>
                       </div>
                     </div>

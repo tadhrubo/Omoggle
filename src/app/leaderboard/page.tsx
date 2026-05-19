@@ -11,35 +11,18 @@ interface LeaderboardEntry {
   avatar_url: string | null;
 }
 
-const TIER_COLORS: Record<string, string> = {
-  Bronze: "#cd7f32",
-  Silver: "#c0c0c0",
-  Gold: "#ffd700",
-  Platinum: "#e5e4e2",
-  Diamond: "#b9f2ff",
-  Crown: "#ff6b6b",
-  "God Tier": "#9d4edd"
-};
+import { getPrestigeRankInfo } from "@/utils/eloMath";
 
-const TIER_GLOW: Record<string, string> = {
-  Bronze: "0 0 20px #cd7f3280",
-  Silver: "0 0 20px #c0c0c080",
-  Gold: "0 0 25px #ffd70090",
-  Platinum: "0 0 30px #e5e4e290",
-  Diamond: "0 0 40px #b9f2ff90",
-  Crown: "0 0 50px #ff6b6b90",
-  "God Tier": "0 0 60px #9d4edd90"
+const getTier = (elo: number) => {
+  const info = getPrestigeRankInfo(elo);
+  return {
+    label: info.name,
+    color: info.color,
+    glow: info.glow,
+    bg: info.bg,
+    border: info.border
+  };
 };
-
-function getTierFromElo(elo: number): string {
-  if (elo >= 2000) return "God Tier";
-  if (elo >= 1700) return "Crown";
-  if (elo >= 1500) return "Diamond";
-  if (elo >= 1350) return "Platinum";
-  if (elo >= 1200) return "Gold";
-  if (elo >= 1000) return "Silver";
-  return "Bronze";
-}
 
 export default function LeaderboardPage() {
   const router = useRouter();
@@ -80,33 +63,38 @@ export default function LeaderboardPage() {
       </div>
 
       {/* Top 3 Legendary Cards */}
-      {entries.length >= 3 && (
-        <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginBottom: "40px", flexWrap: "wrap" }}>
-          {/* 2nd Place */}
-          <div style={{ background: "linear-gradient(180deg, #27272a 0%, #18181b 100%)", border: "2px solid #c0c0c0", borderRadius: "16px", padding: "20px", width: "140px", textAlign: "center", boxShadow: "0 0 30px #c0c0c040" }}>
-            <div style={{ fontSize: "40px", marginBottom: "5px" }}>🥈</div>
-            <div style={{ color: "white", fontWeight: "bold", fontSize: "14px", marginBottom: "5px" }}>{entries[1]?.username || "—"}</div>
-            <div style={{ color: "#c0c0c0", fontSize: "12px", fontFamily: "monospace" }}>{entries[1]?.elo || 0} ELO</div>
-            <div style={{ color: TIER_COLORS[entries[1]?.tier || "Silver"], fontSize: "10px", marginTop: "5px" }}>{entries[1]?.tier || "Silver"}</div>
-          </div>
+      {entries.length >= 3 && (() => {
+        const tier1 = getTier(entries[0]?.elo || 0);
+        const tier2 = getTier(entries[1]?.elo || 0);
+        const tier3 = getTier(entries[2]?.elo || 0);
+        return (
+          <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginBottom: "40px", flexWrap: "wrap" }}>
+            {/* 2nd Place */}
+            <div style={{ background: "linear-gradient(180deg, #27272a 0%, #18181b 100%)", border: `2px solid ${tier2.color}`, borderRadius: "16px", padding: "20px", width: "140px", textAlign: "center", boxShadow: `0 0 30px ${tier2.color}40` }}>
+              <div style={{ fontSize: "40px", marginBottom: "5px" }}>🥈</div>
+              <div style={{ color: "white", fontWeight: "bold", fontSize: "14px", marginBottom: "5px" }}>{entries[1]?.username || "—"}</div>
+              <div style={{ color: "#c0c0c0", fontSize: "12px", fontFamily: "monospace" }}>{entries[1]?.elo || 0} ELO</div>
+              <div style={{ color: tier2.color, textShadow: tier2.glow, fontSize: "10px", marginTop: "5px", fontWeight: "bold" }}>{tier2.label}</div>
+            </div>
 
-          {/* 1st Place */}
-          <div style={{ background: "linear-gradient(180deg, #27272a 0%, #18181b 100%)", border: "2px solid #ffd700", borderRadius: "16px", padding: "25px", width: "160px", textAlign: "center", boxShadow: "0 0 50px #ffd70060" }}>
-            <div style={{ fontSize: "50px", marginBottom: "5px" }}>👑</div>
-            <div style={{ color: "#ffd700", fontWeight: "bold", fontSize: "16px", marginBottom: "5px", textShadow: "0 0 10px #ffd700" }}>{entries[0]?.username || "—"}</div>
-            <div style={{ color: "#ffd700", fontSize: "14px", fontFamily: "monospace" }}>{entries[0]?.elo || 0} ELO</div>
-            <div style={{ color: TIER_COLORS[entries[0]?.tier || "Gold"], fontSize: "11px", marginTop: "5px" }}>{entries[0]?.tier || "Gold"}</div>
-          </div>
+            {/* 1st Place */}
+            <div style={{ background: "linear-gradient(180deg, #27272a 0%, #18181b 100%)", border: `2px solid ${tier1.color}`, borderRadius: "16px", padding: "25px", width: "160px", textAlign: "center", boxShadow: `0 0 50px ${tier1.color}60` }}>
+              <div style={{ fontSize: "50px", marginBottom: "5px" }}>👑</div>
+              <div style={{ color: tier1.color, fontWeight: "bold", fontSize: "16px", marginBottom: "5px", textShadow: tier1.glow }}>{entries[0]?.username || "—"}</div>
+              <div style={{ color: tier1.color, fontSize: "14px", fontFamily: "monospace" }}>{entries[0]?.elo || 0} ELO</div>
+              <div style={{ color: tier1.color, textShadow: tier1.glow, fontSize: "11px", marginTop: "5px", fontWeight: "bold" }}>{tier1.label}</div>
+            </div>
 
-          {/* 3rd Place */}
-          <div style={{ background: "linear-gradient(180deg, #27272a 0%, #18181b 100%)", border: "2px solid #cd7f32", borderRadius: "16px", padding: "20px", width: "140px", textAlign: "center", boxShadow: "0 0 30px #cd7f3240" }}>
-            <div style={{ fontSize: "40px", marginBottom: "5px" }}>🥉</div>
-            <div style={{ color: "white", fontWeight: "bold", fontSize: "14px", marginBottom: "5px" }}>{entries[2]?.username || "—"}</div>
-            <div style={{ color: "#cd7f32", fontSize: "12px", fontFamily: "monospace" }}>{entries[2]?.elo || 0} ELO</div>
-            <div style={{ color: TIER_COLORS[entries[2]?.tier || "Bronze"], fontSize: "10px", marginTop: "5px" }}>{entries[2]?.tier || "Bronze"}</div>
+            {/* 3rd Place */}
+            <div style={{ background: "linear-gradient(180deg, #27272a 0%, #18181b 100%)", border: `2px solid ${tier3.color}`, borderRadius: "16px", padding: "20px", width: "140px", textAlign: "center", boxShadow: `0 0 30px ${tier3.color}40` }}>
+              <div style={{ fontSize: "40px", marginBottom: "5px" }}>🥉</div>
+              <div style={{ color: "white", fontWeight: "bold", fontSize: "14px", marginBottom: "5px" }}>{entries[2]?.username || "—"}</div>
+              <div style={{ color: "#cd7f32", fontSize: "12px", fontFamily: "monospace" }}>{entries[2]?.elo || 0} ELO</div>
+              <div style={{ color: tier3.color, textShadow: tier3.glow, fontSize: "10px", marginTop: "5px", fontWeight: "bold" }}>{tier3.label}</div>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Full Leaderboard Table */}
       <div style={{ maxWidth: "600px", margin: "0 auto" }}>
@@ -119,7 +107,7 @@ export default function LeaderboardPage() {
 
         {entries.slice(3).map((entry, index) => {
           const rank = index + 4;
-          const tierColor = TIER_COLORS[entry.tier] || "#c0c0c0";
+          const tierInfo = getTier(entry.elo || 0);
 
           return (
             <div key={entry.id} onClick={() => router.push(`/profile/${entry.id}`)} style={{ display: "grid", gridTemplateColumns: "50px 1fr 80px 80px", padding: "12px 20px", alignItems: "center", borderBottom: "1px solid #18181b", transition: "background 0.2s", cursor: "pointer" }}
@@ -129,7 +117,7 @@ export default function LeaderboardPage() {
               <span style={{ color: "#52525b", fontFamily: "monospace", fontSize: "12px" }}>#{rank}</span>
               <span style={{ color: "white", fontWeight: "bold", fontSize: "14px" }}>{entry.username}</span>
               <span style={{ color: "#a1a1aa", fontFamily: "monospace", fontSize: "12px", textAlign: "right" }}>{entry.elo}</span>
-              <span style={{ color: tierColor, fontSize: "11px", textAlign: "right", textShadow: `0 0 10px ${tierColor}40` }}>{entry.tier}</span>
+              <span style={{ color: tierInfo.color, fontSize: "11px", textAlign: "right", textShadow: tierInfo.glow !== "none" ? tierInfo.glow : `0 0 10px ${tierInfo.color}40` }}>{tierInfo.label}</span>
             </div>
           );
         })}
