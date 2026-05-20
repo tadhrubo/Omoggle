@@ -93,7 +93,14 @@ export default function RankedVaultPoll() {
           <div>
             <div style={{ color: "white", fontWeight: "bold", marginBottom: "15px" }}>Login required to vote and secure your beta spot.</div>
             <button 
-              onClick={() => window.location.href = "/auth"} 
+              onClick={async () => {
+                await supabase.auth.signInWithOAuth({
+                  provider: 'google',
+                  options: {
+                    redirectTo: `${window.location.origin}/auth/callback`
+                  }
+                });
+              }} 
               style={{ padding: "12px 24px", backgroundColor: "#fbbf24", color: "black", fontWeight: "900", border: "none", borderRadius: "8px", cursor: "pointer", width: "100%" }}
             >
               SIGN UP TO VOTE
