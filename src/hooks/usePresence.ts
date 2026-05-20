@@ -20,6 +20,8 @@ export function usePresence() {
 
   useEffect(() => {
     let mounted = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
     // Resolve the current session asynchronously, then subscribe
     const run = async () => {
@@ -29,22 +31,25 @@ export function usePresence() {
 
       const userId = session?.user?.id ?? "anonymous";
 
-      const channel = supabase.channel("global_lobby", {
+      setOnlineCount(0);
+
+      channel = supabase.channel("global_lobby", {
         config: {
-          presence: { key: userId },
+          presence: { key: userId, enabled: true },
         },
       });
 
       channel
         .on("presence", { event: "sync" }, () => {
           if (!mounted) return;
-          const state = channel.presenceState();
-          // Each key in presenceState() is a unique presence key
-          // (user_id or "anonymous"). Object.keys gives unique users;
-          // summing the arrays inside gives total tabs.
+          const state = channel?.presenceState() ?? {};
+          const uniqueKeys = Object.keys(state).length;
           const totalTabs = Object.values(state).reduce(
             (acc, arr) => acc + arr.length,
             0
+          );
+          console.log(
+            `[Presence sync] keys=${uniqueKeys}, totalTabs=${totalTabs}`
           );
           setOnlineCount(totalTabs);
         })
@@ -55,8 +60,18 @@ export function usePresence() {
           // Handled by sync
         })
         .subscribe(async (status) => {
+          if (!mounted || !channel) return;
           if (status === "SUBSCRIBED") {
             await channel.track({ user_id: userId, joined_at: Date.now() });
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            heartbeatInterval = setInterval(() => {
+              if (!channel) return;
+              channel.track({ user_id: userId, joined_at: Date.now() }).catch(
+                (error) => {
+                  console.warn("Presence heartbeat failed", error);
+                }
+              );
+            }, 10000);
           }
         });
 
@@ -67,9 +82,19 @@ export function usePresence() {
 
     return () => {
       mounted = false;
-      channelPromise.then((channel) => {
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+      }
+      channelPromise.then(async (channel) => {
         if (channel) {
-          channel.untrack().then(() => supabase.removeChannel(channel));
+          try {
+            await channel.untrack();
+            await channel.unsubscribe(10000);
+          } catch (err) {
+            console.warn("Presence cleanup failed", err);
+          } finally {
+            supabase.removeChannel(channel);
+          }
         }
       });
     };
