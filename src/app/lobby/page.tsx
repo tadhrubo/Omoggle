@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Swords, Trophy, BarChart3, ShieldCheck, Star, MessageCircle, Send, X, Copy, Check } from "lucide-react";
+import RankedVaultPoll from "@/components/RankedVaultPoll";
 
 import { RANK_GROUPS, getPrestigeRankInfo } from "@/utils/eloMath";
 
@@ -26,6 +27,7 @@ export default function Lobby() {
   // Private Room State
   const [isPrivateModalOpen, setIsPrivateModalOpen] = useState(false);
   const [privateTab, setPrivateTab] = useState<"create" | "join">("create");
+  const [isVaultedModalOpen, setIsVaultedModalOpen] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState("");
   const [codeCopied, setCodeCopied] = useState(false);
@@ -237,18 +239,11 @@ export default function Lobby() {
                 <ModeCard 
                   icon={<Trophy/>} 
                   title="RANKED MATCH" 
-                  desc="Competitive ELO. Climb from LTN to TRUE ADAM." 
+                  desc="Temporarily vaulted. Click to cast your vote and secure your spot." 
                   color="#fbbf24" 
                   active 
                   className="mode-card"
-                  onClick={() => {
-                    if (!currentUserId) {
-                      setAuthModalReason("ranked");
-                      setIsAuthRequiredModalOpen(true);
-                    } else {
-                      router.push("/arena?mode=ranked");
-                    }
-                  }}
+                  onClick={() => setIsVaultedModalOpen(true)}
                 />
                 <ModeCard 
                   icon={<ShieldCheck/>} 
@@ -577,6 +572,21 @@ export default function Lobby() {
                 Private battles don't affect your ELO rating. Both players need to enter the arena with the same code.
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── RANKED VAULTED POLL MODAL ─── */}
+      {isVaultedModalOpen && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 220, backdropFilter: "blur(8px)", padding: "20px" }}>
+          <div style={{ position: "relative", width: "100%", maxWidth: "600px" }}>
+            <button 
+              onClick={() => setIsVaultedModalOpen(false)} 
+              style={{ position: "absolute", top: "15px", right: "15px", background: "none", border: "none", color: "#71717a", cursor: "pointer", zIndex: 10 }}
+            >
+              <X size={24} />
+            </button>
+            <RankedVaultPoll />
           </div>
         </div>
       )}
