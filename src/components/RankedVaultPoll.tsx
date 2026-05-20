@@ -35,6 +35,7 @@ export default function RankedVaultPoll() {
 
   const handleVote = async (isYes: boolean) => {
     if (!session?.user?.id) return;
+    if (hasVoted === isYes) return;
     setIsVoting(true);
 
     try {
@@ -43,11 +44,28 @@ export default function RankedVaultPoll() {
         vote_yes: isYes
       }, { onConflict: 'user_id' });
 
+      setTotalVotes(prev => {
+        let yesDelta = 0;
+        let noDelta = 0;
+
+        if (hasVoted === null) {
+          if (isYes) yesDelta = 1;
+          else noDelta = 1;
+        } else if (hasVoted === true && !isYes) {
+          yesDelta = -1;
+          noDelta = 1;
+        } else if (hasVoted === false && isYes) {
+          yesDelta = 1;
+          noDelta = -1;
+        }
+
+        return {
+          yes: prev.yes + yesDelta,
+          no: prev.no + noDelta
+        };
+      });
+
       setHasVoted(isYes);
-      setTotalVotes(prev => ({
-        yes: isYes ? prev.yes + 1 : (hasVoted === true ? prev.yes - 1 : prev.yes),
-        no: !isYes ? prev.no + 1 : (hasVoted === false ? prev.no - 1 : prev.no)
-      }));
     } catch (error) {
       console.error("Vote failed:", error);
     } finally {
@@ -86,15 +104,15 @@ export default function RankedVaultPoll() {
             <div style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
               <button 
                 onClick={() => handleVote(true)}
-                disabled={isVoting}
-                style={{ flex: "1 1 200px", padding: "15px", backgroundColor: hasVoted === true ? "#fbbf24" : "#27272a", color: hasVoted === true ? "black" : "white", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer", transition: "all 0.2s" }}
+                disabled={isVoting || hasVoted === true}
+                style={{ flex: "1 1 200px", padding: "15px", backgroundColor: hasVoted === true ? "#fbbf24" : "#27272a", color: hasVoted === true ? "black" : "white", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: (isVoting || hasVoted === true) ? "not-allowed" : "pointer", transition: "all 0.2s", opacity: hasVoted === false ? 0.6 : 1 }}
               >
                 YES, I'D PAY FOR RANKED
               </button>
               <button 
                 onClick={() => handleVote(false)}
-                disabled={isVoting}
-                style={{ flex: "1 1 200px", padding: "15px", backgroundColor: hasVoted === false ? "#ef4444" : "#27272a", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: "pointer", transition: "all 0.2s" }}
+                disabled={isVoting || hasVoted === false}
+                style={{ flex: "1 1 200px", padding: "15px", backgroundColor: hasVoted === false ? "#ef4444" : "#27272a", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: (isVoting || hasVoted === false) ? "not-allowed" : "pointer", transition: "all 0.2s", opacity: hasVoted === true ? 0.6 : 1 }}
               >
                 NO, KEEP IT CASUAL
               </button>
