@@ -22,6 +22,10 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect,
   const [liveOpponentScore, setLiveOpponentScore] = useState<number | null>(null);
   const [remoteProfile, setRemoteProfile] = useState<any>(null);
   const [rematchState, setRematchState] = useState<'idle' | 'requested_by_me' | 'requested_by_opponent'>('idle');
+  const [searchTimeout, setSearchTimeout] = useState(false);
+
+  // Ref that holds the 45-second matchmaking deadline timer
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const peerRef = useRef<Peer | null>(null);
   const callRef = useRef<MediaConnection | null>(null);
@@ -52,6 +56,47 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect,
     setRematchState('idle');
     if (onRematchRef.current) onRematchRef.current();
   }, [sendTelemetry]);
+
+  /**
+   * hardCleanup — kills all WebRTC resources immediately.
+   * Called both by the 45s timeout and by the normal unmount cleanup.
+   */
+  const hardCleanup = useCallback(() => {
+    // 1. Stop the polling interval
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    // 2. Kill all camera/mic tracks so the camera LED turns off
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+    // 3. Close the active call
+    if (callRef.current) {
+      callRef.current.close();
+      callRef.current = null;
+    }
+    // 4. Destroy the PeerJS instance (closes ICE / TURN allocation)
+    if (peerRef.current) {
+      const id = peerRef.current.id;
+      if (id) {
+        supabase.from("arena_queue").delete().eq("peer_id", id).then();
+        supabase.from("ranked_queue").delete().eq("peer_id", id).then();
+      }
+      peerRef.current.destroy();
+      peerRef.current = null;
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /**
+   * resetSearch — clears the timeout flag and reloads to start a fresh search.
+   * The page.tsx arena UI calls this when the user clicks "SEARCH AGAIN".
+   */
+  const resetSearch = useCallback(() => {
+    setSearchTimeout(false);
+    // A full reload is the cleanest way to reinitialise PeerJS + camera
+    window.location.reload();
+  }, []);
 
   const setupDataConnection = useCallback((conn: DataConnection) => {
     dataConnRef.current = conn;
@@ -124,6 +169,11 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect,
 
         call.on("stream", (remoteMedia) => {
           clearTimeout(connectionTimeout);
+          // ── Clear the 45s search deadline on successful ranked connection ──
+          if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+            searchTimeoutRef.current = null;
+          }
           setRemoteStream(remoteMedia);
           setIsConnected(true);
           setIsConnecting(false);
@@ -146,7 +196,22 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect,
   const findMatchInternal = async (peer: Peer, stream: MediaStream) => {
     setIsSearching(true);
     setIsConnecting(false);
-    
+    setSearchTimeout(false);
+
+    // ── 45-second hard deadline ────────────────────────────────────────────
+    // Clear any previous timer before arming a new one
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      // Only fire if we're still searching (not yet connected)
+      if (!peerRef.current || peerRef.current.disconnected || peerRef.current.destroyed) return;
+      console.warn("[Matchmaker] 45s search timeout — cleaning up TURN/WebRTC resources.");
+      hardCleanup();
+      setIsSearching(false);
+      setIsConnecting(false);
+      setSearchTimeout(true);
+    }, 45000);
+    // ──────────────────────────────────────────────────────────────────────
+
     if (mode === "ranked") {
       await supabase.from("ranked_queue").delete().eq("peer_id", peer.id);
       await supabase.from("ranked_queue").insert([{ peer_id: peer.id, elo: playerElo }]);
@@ -191,6 +256,11 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect,
 
           call.on("stream", (remoteMedia) => {
             clearTimeout(connectionTimeout);
+            // ── Clear the 45s search deadline on successful connection ──
+            if (searchTimeoutRef.current) {
+              clearTimeout(searchTimeoutRef.current);
+              searchTimeoutRef.current = null;
+            }
             setRemoteStream(remoteMedia);
             setIsConnected(true);
             setIsConnecting(false);
@@ -262,6 +332,11 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect,
 
         peer.on("call", (call) => {
           if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+          // ── Incoming call = match found; cancel the search deadline ──
+          if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+            searchTimeoutRef.current = null;
+          }
           setIsConnecting(true);
           call.answer(stream);
           callRef.current = call;
@@ -285,25 +360,13 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect,
     
     return () => { 
       isMounted = false;
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-      
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-
-      if (peerRef.current) {
-        const id = peerRef.current.id;
-        if (id) {
-          supabase.from("arena_queue").delete().eq("peer_id", id).then();
-          supabase.from("ranked_queue").delete().eq("peer_id", id).then();
-        }
-        peerRef.current.destroy();
-      }
+      // Clear the 45s deadline on unmount
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      hardCleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, playerElo]);
 
-  // NEW: Return isDataConnected & rematch controls
   return { 
     localStream, 
     remoteStream, 
@@ -318,6 +381,8 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect,
     rematchState,
     requestRematch,
     acceptRematch,
+    searchTimeout,
+    resetSearch,
     skip: () => window.location.reload() 
   };
 }

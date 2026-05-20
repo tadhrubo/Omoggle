@@ -79,7 +79,8 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
   const { 
     localStream, remoteStream, isSearching, isConnected, isConnecting, isDataConnected,
     opponentScore, liveOpponentScore, remoteProfile, skip, sendTelemetry,
-    rematchState, requestRematch, acceptRematch 
+    rematchState, requestRematch, acceptRematch,
+    searchTimeout, resetSearch
   } = useMatchmaker({
     mode: mode,
     playerElo: localProfile.elo,
@@ -268,10 +269,22 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
     }
   }, [countdown, battlePhase, myScore, liveMyScore, opponentScore, mode, localProfile, remoteProfile, supabase, trackEvent]);
 
+  // Ref mirror of searchTimeout so the rAF loop can see it without stale closure
+  const searchTimeoutActiveRef = useRef(searchTimeout);
+  useEffect(() => {
+    searchTimeoutActiveRef.current = searchTimeout;
+  }, [searchTimeout]);
+
   const handleLocalVideoReady = () => {
     if (requestRef.current) cancelAnimationFrame(requestRef.current);
     
     const loop = () => {
+      // ── Pause the entire scanner loop while timed out to save CPU ──
+      if (searchTimeoutActiveRef.current) {
+        requestRef.current = requestAnimationFrame(loop);
+        return;
+      }
+
       if (localVideoRef.current && localCanvasRef.current) {
         const video = localVideoRef.current;
         const canvas = localCanvasRef.current;
@@ -450,7 +463,57 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
 
       <div className="flex flex-col md:flex-row w-full h-full flex-1 overflow-hidden">
         <div className="relative flex-1 w-full md:w-1/2 h-1/2 md:h-full border-b md:border-b-0 md:border-r border-zinc-800 bg-black">
-          {isSearching && (
+        {/* ── 45-second search timeout state ────────────────────────────── */}
+          {searchTimeout && (
+            <div style={{
+              position: "absolute", inset: 0, display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center", zIndex: 15,
+              backgroundColor: "rgba(9,9,11,0.92)", backdropFilter: "blur(6px)",
+            }}>
+              {/* Warning icon */}
+              <div style={{ fontSize: "3rem", marginBottom: "12px" }}>⏱</div>
+              <h2 style={{
+                fontFamily: "var(--font-bebas, monospace)", fontSize: "2.2rem",
+                color: "#ef4444", letterSpacing: "3px", margin: 0, textAlign: "center",
+                textShadow: "0 0 20px rgba(239,68,68,0.6)",
+              }}>
+                NO OPPONENT FOUND
+              </h2>
+              <p style={{
+                fontFamily: "monospace", fontSize: "12px", color: "#71717a",
+                marginTop: "10px", marginBottom: "28px", textAlign: "center",
+                letterSpacing: "1px", maxWidth: "260px",
+              }}>
+                The arena is quiet right now.{"\n"}Try searching again.
+              </p>
+              <button
+                onClick={resetSearch}
+                style={{
+                  backgroundColor: "#ef4444", color: "white", border: "none",
+                  borderRadius: "8px", padding: "14px 36px", fontWeight: "900",
+                  fontSize: "16px", letterSpacing: "2px", cursor: "pointer",
+                  fontFamily: "var(--font-bebas, monospace)",
+                  boxShadow: "0 0 24px rgba(239,68,68,0.4)",
+                }}
+              >
+                SEARCH AGAIN
+              </button>
+              <button
+                onClick={() => router.push("/lobby")}
+                style={{
+                  marginTop: "12px", backgroundColor: "transparent", color: "#71717a",
+                  border: "1px solid #27272a", borderRadius: "8px", padding: "10px 28px",
+                  fontWeight: "bold", fontSize: "13px", cursor: "pointer",
+                  fontFamily: "monospace",
+                }}
+              >
+                BACK TO LOBBY
+              </button>
+            </div>
+          )}
+
+          {/* ── Normal searching / connecting overlay (hidden when timeout) ── */}
+          {isSearching && !searchTimeout && (
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: mode === "ranked" ? "#fbbf24" : "#ef4444", zIndex: 10 }}>
               <span style={{ fontFamily: "monospace", letterSpacing: "2px", fontWeight: "bold" }}>
                 {isConnecting 
