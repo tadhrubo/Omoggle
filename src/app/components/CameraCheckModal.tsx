@@ -90,16 +90,33 @@ export default function CameraCheckModal({ isOpen, onComplete, onExit }: CameraC
 
             const landmarks = result.faceLandmarks[0] as unknown as FaceLandmarks[];
 
-            ctx.fillStyle = "#39FF14"; // Neon Green
+            const SLEEK_INDICES = [10, 152, 234, 454, 132, 361, 33, 263, 4, 61, 291];
+            const pts = SLEEK_INDICES.map(idx => {
+              const pt = landmarks[idx];
+              return pt ? { x: (pt.x * renderWidth) + offsetX, y: (pt.y * renderHeight) + offsetY } : null;
+            }).filter(Boolean) as {x: number, y: number}[];
+
+            // Draw sleek connecting lines
+            ctx.lineWidth = 0.5;
+            ctx.strokeStyle = "rgba(57, 255, 20, 0.3)";
+            ctx.beginPath();
+            for (let i = 0; i < pts.length; i++) {
+              for (let j = i + 1; j < pts.length; j++) {
+                const dist = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+                if (dist < canvas.width * 0.25) {
+                  ctx.moveTo(pts[i].x, pts[i].y);
+                  ctx.lineTo(pts[j].x, pts[j].y);
+                }
+              }
+            }
+            ctx.stroke();
+
+            // Draw dots
+            ctx.fillStyle = "#39FF14";
             ctx.globalAlpha = 0.8;
-            
-            landmarks.forEach((point: FaceLandmarks) => {
-               // Map normalized points to the calculated object-fit dimensions
-              const x = (point.x * renderWidth) + offsetX;
-              const y = (point.y * renderHeight) + offsetY;
-              
+            pts.forEach(pt => {
               ctx.beginPath();
-              ctx.arc(x, y, 1.5, 0, 2 * Math.PI);
+              ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI);
               ctx.fill();
             });
             ctx.globalAlpha = 1;

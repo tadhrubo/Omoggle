@@ -240,21 +240,25 @@ function calculateEyeAspectRatio(landmarks: Landmark[]): number {
 
 // Previous EAR value for blink detection
 let previousEAR = 0.3;
+let maxEAR = 0.20; // Self-calibrating baseline
 let blinkThresholdCrossed = false;
 
 export function detectBlink(landmarks: Landmark[]): boolean {
   const currentEAR = calculateEyeAspectRatio(landmarks);
-  console.log("Current EAR:", currentEAR.toFixed(3));
+  
+  // Dynamically calibrate open EAR
+  if (currentEAR > maxEAR && currentEAR < 0.35) {
+    maxEAR = currentEAR;
+  }
 
-  // Blink detection logic:
-  // 1. EAR drops below threshold (eye closes)
-  // 2. EAR rises back above threshold (eye opens again)
-  if (currentEAR < 0.22 && previousEAR >= 0.22) {
+  const closedThreshold = maxEAR * 0.65;
+  const openThreshold = maxEAR * 0.85;
+
+  if (currentEAR < closedThreshold && previousEAR >= closedThreshold) {
     blinkThresholdCrossed = true;
   }
 
-  if (blinkThresholdCrossed && currentEAR > 0.25 && previousEAR <= 0.25) {
-    // Reset and return true (blink completed)
+  if (blinkThresholdCrossed && currentEAR > openThreshold && previousEAR <= openThreshold) {
     blinkThresholdCrossed = false;
     previousEAR = currentEAR;
     return true;
@@ -309,6 +313,7 @@ export function detectTurnLeft(landmarks: Landmark[]): boolean {
 // Reset function for liveness detection state
 export function resetLivenessState(): void {
   previousEAR = 0.3;
+  maxEAR = 0.20;
   blinkThresholdCrossed = false;
   initialNoseX = null;
 }

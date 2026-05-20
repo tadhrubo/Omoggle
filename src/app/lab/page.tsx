@@ -118,16 +118,37 @@ export default function Lab() {
 
           // Draw Landmarks if they exist
           if (result && result.faceLandmarks && result.faceLandmarks.length > 0) {
-            const landmarks = result.faceLandmarks[0]; // Get the first face
-            const drawingUtils = new DrawingUtils(ctx);
-            const style = { color: "rgba(0, 255, 0, 0.4)", lineWidth: 1 };
+            const landmarks = result.faceLandmarks[0];
+            const SLEEK_INDICES = [10, 152, 234, 454, 132, 361, 33, 263, 4, 61, 291];
+            const pts = SLEEK_INDICES.map(idx => {
+              const pt = landmarks[idx];
+              return pt ? { x: pt.x * canvas.width, y: pt.y * canvas.height } : null;
+            }).filter(Boolean) as {x: number, y: number}[];
 
-            drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_FACE_OVAL, style);
-            drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, style);
-            drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, style);
-            drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYEBROW, style);
-            drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_LEFT_EYEBROW, style);
-            drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_LIPS, style);
+            // Draw sleek connecting lines
+            ctx.lineWidth = 0.5;
+            ctx.strokeStyle = "rgba(57, 255, 20, 0.3)";
+            ctx.beginPath();
+            for (let i = 0; i < pts.length; i++) {
+              for (let j = i + 1; j < pts.length; j++) {
+                const dist = Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y);
+                if (dist < canvas.width * 0.25) {
+                  ctx.moveTo(pts[i].x, pts[i].y);
+                  ctx.lineTo(pts[j].x, pts[j].y);
+                }
+              }
+            }
+            ctx.stroke();
+
+            // Draw dots
+            ctx.fillStyle = "#39FF14";
+            ctx.globalAlpha = 0.8;
+            pts.forEach(pt => {
+              ctx.beginPath();
+              ctx.arc(pt.x, pt.y, 1.5, 0, 2 * Math.PI);
+              ctx.fill();
+            });
+            ctx.globalAlpha = 1;
           }
         }
       }
