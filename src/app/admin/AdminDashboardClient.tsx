@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { usePresence } from "@/hooks/usePresence";
 import { 
   BarChart3, 
   TrendingUp, 
@@ -81,6 +82,10 @@ export default function AdminDashboardClient({
 }: AdminDashboardClientProps) {
   // Navigation & Tabs
   const [activeTab, setActiveTab] = useState<"chart" | "players" | "matches">("chart");
+
+  // ── Real-time presence counter (replaces inflated WebSocket count) ──────────
+  const { onlineCount } = usePresence();
+
   const [timeRange, setTimeRange] = useState<"24h" | "30d" | "12w" | "12m">("30d");
   const [activeMetric, setActiveMetric] = useState<
     "session_start" | "battle_join" | "battle_complete" | "share_click" | "signups" | "all"
@@ -578,17 +583,19 @@ export default function AdminDashboardClient({
       {/* Grid of Key Performance Indicators (KPIs) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         
-        {/* KPI 1: Active Users */}
-        <div className="relative group overflow-hidden border border-zinc-800/80 p-5 bg-zinc-950/40 backdrop-blur-xl rounded-2xl transition-all duration-300 hover:border-zinc-700 min-h-[130px]">
+        {/* KPI 1: Live Active Users — Supabase Presence */}
+        <div className="relative group overflow-hidden border border-emerald-900/50 p-5 bg-zinc-950/40 backdrop-blur-xl rounded-2xl transition-all duration-300 hover:border-emerald-700/60 min-h-[130px]">
           <div className="absolute top-4 right-4 opacity-5 text-white pointer-events-none">
             <Users style={{ width: "52px", height: "52px" }} />
           </div>
-          <p className="text-zinc-500 text-[10px] tracking-wider uppercase mb-1.5">DAU (24H ACTIVE)</p>
-          <p className="text-4xl font-black tracking-tighter text-white">{kpis.dau}</p>
-          <div className="flex items-center gap-2 mt-4 text-[10px] text-zinc-500 border-t border-zinc-900 pt-3 font-sans">
-            <span className="text-red-500 font-mono font-bold">{kpis.newDau}</span> NEW
-            <span className="text-zinc-800 font-bold">•</span>
-            <span className="text-cyan-400 font-mono font-bold">{kpis.returningDau}</span> ACTIVE
+          <p className="text-zinc-500 text-[10px] tracking-wider uppercase mb-1.5">LIVE USERS ONLINE</p>
+          <div className="flex items-center gap-3">
+            <p className="text-4xl font-black tracking-tighter text-emerald-400">{onlineCount}</p>
+            {/* Pulse dot */}
+            <span style={{ width: "10px", height: "10px", borderRadius: "50%", backgroundColor: "#22c55e", boxShadow: "0 0 8px rgba(34,197,94,0.9)", display: "inline-block", flexShrink: 0 }} />
+          </div>
+          <div className="flex items-center gap-1.5 mt-4 text-[10px] text-zinc-500 border-t border-zinc-900 pt-3 font-sans">
+            Via <span className="text-emerald-400 font-mono font-bold mx-1">Supabase Presence</span> — zero inflation
           </div>
         </div>
 
