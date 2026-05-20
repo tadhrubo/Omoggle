@@ -252,7 +252,7 @@ const jsonLd = {
   ],
 };
 
-// ─── ROOT LAYOUT ─────────────────────────────────────────────────────────────
+// ─── ROOT LAYOUT ────────────────────────────────────────────────
 export default function RootLayout({
   children,
 }: {
