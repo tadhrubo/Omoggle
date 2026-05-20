@@ -83,7 +83,7 @@ export default function AdminDashboardClient({
   const [activeTab, setActiveTab] = useState<"chart" | "players" | "matches">("chart");
   const [timeRange, setTimeRange] = useState<"24h" | "30d" | "12w" | "12m">("30d");
   const [activeMetric, setActiveMetric] = useState<
-    "session_start" | "battle_join" | "battle_complete" | "share_click" | "all"
+    "session_start" | "battle_join" | "battle_complete" | "share_click" | "signups" | "all"
   >("session_start");
   const [chartType, setChartType] = useState<"line" | "bar">("line");
   const [hoveredPoint, setHoveredPoint] = useState<{
@@ -109,7 +109,7 @@ export default function AdminDashboardClient({
     message: string;
     profileId: string;
   } | null>(null);
-  const [showSqlGuide, setShowSqlGuide] = useState(false);
+
 
   const now = useMemo(() => new Date(), []);
   const oneDay = 24 * 60 * 60 * 1000;
@@ -160,6 +160,9 @@ export default function AdminDashboardClient({
     });
     const d1Retention = yesterdayCohort > 0 ? Math.round((yesterdayRetained / yesterdayCohort) * 100) : 0;
 
+    const totalSignups = initialProfiles.length;
+    const signupConversion = uniqueUsers > 0 ? Math.min(Math.round((totalSignups / uniqueUsers) * 100), 100) : 0;
+
     return {
       dau,
       newDau,
@@ -173,9 +176,10 @@ export default function AdminDashboardClient({
       uniqueUsers,
       sessionsPerUser,
       shareClicks,
-      shareRate
+      shareRate,
+      signupConversion
     };
-  }, [initialEvents, now]);
+  }, [initialEvents, initialProfiles, now]);
 
   // --- SECURE SESSION TERMINATION ---
   const handleLogout = () => {
@@ -274,19 +278,34 @@ export default function AdminDashboardClient({
         const label = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
         result.push({ label, value: 0, date: d });
       }
-      initialEvents.forEach(e => {
-        const ed = new Date(e.created_at);
-        if (now.getTime() - ed.getTime() <= 24 * 60 * 60 * 1000) {
-          const hourIndex = result.findIndex(r => {
-            return ed.getHours() === r.date.getHours() && ed.getDate() === r.date.getDate();
-          });
-          if (hourIndex !== -1) {
-            if (activeMetric === "all" || e.event_type === activeMetric) {
+      if (activeMetric === "signups") {
+        initialProfiles.forEach(p => {
+          if (!p.created_at) return;
+          const pd = new Date(p.created_at);
+          if (now.getTime() - pd.getTime() <= 24 * 60 * 60 * 1000) {
+            const hourIndex = result.findIndex(r => {
+              return pd.getHours() === r.date.getHours() && pd.getDate() === r.date.getDate();
+            });
+            if (hourIndex !== -1) {
               result[hourIndex].value++;
             }
           }
-        }
-      });
+        });
+      } else {
+        initialEvents.forEach(e => {
+          const ed = new Date(e.created_at);
+          if (now.getTime() - ed.getTime() <= 24 * 60 * 60 * 1000) {
+            const hourIndex = result.findIndex(r => {
+              return ed.getHours() === r.date.getHours() && ed.getDate() === r.date.getDate();
+            });
+            if (hourIndex !== -1) {
+              if (activeMetric === "all" || e.event_type === activeMetric) {
+                result[hourIndex].value++;
+              }
+            }
+          }
+        });
+      }
     } else if (timeRange === "30d") {
       for (let i = 29; i >= 0; i--) {
         const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
@@ -294,19 +313,34 @@ export default function AdminDashboardClient({
         const label = d.toLocaleDateString([], { month: "short", day: "2-digit" });
         result.push({ label, value: 0, date: d });
       }
-      initialEvents.forEach(e => {
-        const ed = new Date(e.created_at);
-        if (now.getTime() - ed.getTime() <= 30 * 24 * 60 * 60 * 1000) {
-          const dayIndex = result.findIndex(r => {
-            return ed.getDate() === r.date.getDate() && ed.getMonth() === r.date.getMonth();
-          });
-          if (dayIndex !== -1) {
-            if (activeMetric === "all" || e.event_type === activeMetric) {
+      if (activeMetric === "signups") {
+        initialProfiles.forEach(p => {
+          if (!p.created_at) return;
+          const pd = new Date(p.created_at);
+          if (now.getTime() - pd.getTime() <= 30 * 24 * 60 * 60 * 1000) {
+            const dayIndex = result.findIndex(r => {
+              return pd.getDate() === r.date.getDate() && pd.getMonth() === r.date.getMonth();
+            });
+            if (dayIndex !== -1) {
               result[dayIndex].value++;
             }
           }
-        }
-      });
+        });
+      } else {
+        initialEvents.forEach(e => {
+          const ed = new Date(e.created_at);
+          if (now.getTime() - ed.getTime() <= 30 * 24 * 60 * 60 * 1000) {
+            const dayIndex = result.findIndex(r => {
+              return ed.getDate() === r.date.getDate() && ed.getMonth() === r.date.getMonth();
+            });
+            if (dayIndex !== -1) {
+              if (activeMetric === "all" || e.event_type === activeMetric) {
+                result[dayIndex].value++;
+              }
+            }
+          }
+        });
+      }
     } else if (timeRange === "12w") {
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
@@ -317,46 +351,80 @@ export default function AdminDashboardClient({
         const label = "Wk of " + startOfWeek.toLocaleDateString([], { month: "short", day: "numeric" });
         result.push({ label, value: 0, date: startOfWeek });
       }
-      initialEvents.forEach(e => {
-        const ed = new Date(e.created_at);
-        if (now.getTime() - ed.getTime() <= 12 * 7 * 24 * 60 * 60 * 1000) {
-          let matchedIndex = -1;
-          for (let i = 0; i < result.length; i++) {
-            const bucketStart = result[i].date.getTime();
-            const bucketEnd = bucketStart + 7 * 24 * 60 * 60 * 1000;
-            if (ed.getTime() >= bucketStart && ed.getTime() < bucketEnd) {
-              matchedIndex = i;
-              break;
+      if (activeMetric === "signups") {
+        initialProfiles.forEach(p => {
+          if (!p.created_at) return;
+          const pd = new Date(p.created_at);
+          if (now.getTime() - pd.getTime() <= 12 * 7 * 24 * 60 * 60 * 1000) {
+            let matchedIndex = -1;
+            for (let i = 0; i < result.length; i++) {
+              const bucketStart = result[i].date.getTime();
+              const bucketEnd = bucketStart + 7 * 24 * 60 * 60 * 1000;
+              if (pd.getTime() >= bucketStart && pd.getTime() < bucketEnd) {
+                matchedIndex = i;
+                break;
+              }
             }
-          }
-          if (matchedIndex !== -1) {
-            if (activeMetric === "all" || e.event_type === activeMetric) {
+            if (matchedIndex !== -1) {
               result[matchedIndex].value++;
             }
           }
-        }
-      });
+        });
+      } else {
+        initialEvents.forEach(e => {
+          const ed = new Date(e.created_at);
+          if (now.getTime() - ed.getTime() <= 12 * 7 * 24 * 60 * 60 * 1000) {
+            let matchedIndex = -1;
+            for (let i = 0; i < result.length; i++) {
+              const bucketStart = result[i].date.getTime();
+              const bucketEnd = bucketStart + 7 * 24 * 60 * 60 * 1000;
+              if (ed.getTime() >= bucketStart && ed.getTime() < bucketEnd) {
+                matchedIndex = i;
+                break;
+              }
+            }
+            if (matchedIndex !== -1) {
+              if (activeMetric === "all" || e.event_type === activeMetric) {
+                result[matchedIndex].value++;
+              }
+            }
+          }
+        });
+      }
     } else if (timeRange === "12m") {
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const label = d.toLocaleDateString([], { month: "short", year: "2-digit" });
         result.push({ label, value: 0, date: d });
       }
-      initialEvents.forEach(e => {
-        const ed = new Date(e.created_at);
-        const monthIndex = result.findIndex(r => {
-          return ed.getMonth() === r.date.getMonth() && ed.getFullYear() === r.date.getFullYear();
-        });
-        if (monthIndex !== -1) {
-          if (activeMetric === "all" || e.event_type === activeMetric) {
+      if (activeMetric === "signups") {
+        initialProfiles.forEach(p => {
+          if (!p.created_at) return;
+          const pd = new Date(p.created_at);
+          const monthIndex = result.findIndex(r => {
+            return pd.getMonth() === r.date.getMonth() && pd.getFullYear() === r.date.getFullYear();
+          });
+          if (monthIndex !== -1) {
             result[monthIndex].value++;
           }
-        }
-      });
+        });
+      } else {
+        initialEvents.forEach(e => {
+          const ed = new Date(e.created_at);
+          const monthIndex = result.findIndex(r => {
+            return ed.getMonth() === r.date.getMonth() && ed.getFullYear() === r.date.getFullYear();
+          });
+          if (monthIndex !== -1) {
+            if (activeMetric === "all" || e.event_type === activeMetric) {
+              result[monthIndex].value++;
+            }
+          }
+        });
+      }
     }
 
     return result;
-  }, [initialEvents, timeRange, activeMetric, now]);
+  }, [initialEvents, initialProfiles, timeRange, activeMetric, now]);
 
   // --- SVG PLOTTING PARAMETERS ---
   const svgParams = useMemo(() => {
@@ -469,13 +537,7 @@ export default function AdminDashboardClient({
 
         {/* Header control buttons */}
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={() => setShowSqlGuide(!showSqlGuide)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-zinc-950 border border-zinc-800 hover:border-red-500/30 text-xs font-bold text-zinc-400 hover:text-white rounded-xl transition-all cursor-pointer shadow-md"
-          >
-            <FileCode size={14} className="text-red-500" />
-            <span>DATABASE SETUP SCRIPTS</span>
-          </button>
+
           
           <button
             onClick={handleLogout}
@@ -487,72 +549,7 @@ export default function AdminDashboardClient({
         </div>
       </div>
 
-      {/* SQL Setup Instruction Card (Conditionally expanded) */}
-      {showSqlGuide && (
-        <div className="border border-zinc-800 bg-zinc-950 rounded-2xl p-6 mb-8 relative animate-fade-in">
-          <button 
-            onClick={() => setShowSqlGuide(false)}
-            className="absolute top-4 right-4 text-zinc-500 hover:text-white"
-          >
-            <X size={18} />
-          </button>
-          
-          <div className="flex items-start gap-4 mb-4">
-            <div className="w-10 h-10 bg-zinc-900 border border-red-500/20 rounded-lg flex items-center justify-center text-red-500 flex-shrink-0">
-              <FileCode size={20} />
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-white uppercase tracking-wider">RESOLVING ROW-LEVEL SECURITY (RLS) 401 ERRORS</h3>
-              <p className="text-xs text-zinc-400 mt-1 font-sans">
-                If matches or website sessions aren't tracking, it's because Supabase blocks client mutations by default. Paste this code into your Supabase SQL editor:
-              </p>
-            </div>
-          </div>
 
-          <div className="bg-[#09090b] border border-zinc-900 rounded-xl p-4 overflow-x-auto relative">
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(`ALTER TABLE analytics_events DISABLE ROW LEVEL SECURITY;
-ALTER TABLE matches DISABLE ROW LEVEL SECURITY;
-
-CREATE OR REPLACE FUNCTION admin_set_ban_status(p_user_id UUID, p_is_banned BOOLEAN)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  UPDATE profiles
-  SET is_banned = p_is_banned
-  WHERE id = p_user_id;
-END;
-$$;`);
-                alert("SQL copied to clipboard!");
-              }}
-              className="absolute top-3.5 right-4 text-[9px] font-bold text-red-500 hover:text-red-400 bg-red-950/30 border border-red-950 px-2 py-1 rounded"
-            >
-              COPY CODE
-            </button>
-            <pre className="text-[10px] text-zinc-500 leading-relaxed font-mono select-all">
-{`-- Disable RLS to allow public guest matches and events logging
-ALTER TABLE analytics_events DISABLE ROW LEVEL SECURITY;
-ALTER TABLE matches DISABLE ROW LEVEL SECURITY;
-
--- Create high-privilege player moderation helper
-CREATE OR REPLACE FUNCTION admin_set_ban_status(p_user_id UUID, p_is_banned BOOLEAN)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  UPDATE profiles
-  SET is_banned = p_is_banned
-  WHERE id = p_user_id;
-END;
-$$;`}
-            </pre>
-          </div>
-        </div>
-      )}
 
       {/* Moderation Failures System Banner */}
       {moderationError && (
@@ -567,12 +564,7 @@ $$;`}
             </div>
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={() => setShowSqlGuide(true)}
-              className="px-3.5 py-1.5 bg-red-950 border border-red-800 text-[10px] font-bold uppercase rounded text-red-300 hover:text-white transition-all cursor-pointer"
-            >
-              RUN FIX SQL
-            </button>
+
             <button
               onClick={() => setModerationError(null)}
               className="px-2.5 py-1.5 bg-zinc-900 border border-zinc-800 text-[10px] font-bold uppercase rounded text-zinc-500 hover:text-white transition-all cursor-pointer"
@@ -624,15 +616,15 @@ $$;`}
           </div>
         </div>
 
-        {/* KPI 4: Completion Rate */}
+        {/* KPI 4: Sign Up Conversion */}
         <div className="relative group overflow-hidden border border-zinc-800/80 p-5 bg-zinc-950/40 backdrop-blur-xl rounded-2xl transition-all duration-300 hover:border-zinc-700 min-h-[130px]">
           <div className="absolute top-4 right-4 opacity-5 text-white pointer-events-none">
-            <Share2 style={{ width: "52px", height: "52px" }} />
+            <Users style={{ width: "52px", height: "52px" }} />
           </div>
-          <p className="text-zinc-500 text-[10px] tracking-wider uppercase mb-1.5">RESULT SHARE RATIO</p>
-          <p className="text-4xl font-black tracking-tighter text-purple-500">{kpis.shareRate}%</p>
+          <p className="text-zinc-500 text-[10px] tracking-wider uppercase mb-1.5">SIGN UP CONVERSION</p>
+          <p className="text-4xl font-black tracking-tighter text-purple-500">{kpis.signupConversion}%</p>
           <div className="flex items-center gap-2 mt-4 text-[10px] text-zinc-500 border-t border-zinc-900 pt-3 font-sans">
-            <span className="text-purple-400 font-mono font-bold">{kpis.shareClicks}</span> conversion actions
+            <span className="text-purple-400 font-mono font-bold">{profiles.length}</span> conversion actions
           </div>
         </div>
       </div>
@@ -693,6 +685,7 @@ $$;`}
                     { id: "battle_join", label: "Battles Joined", icon: <Sword size={11} /> },
                     { id: "battle_complete", label: "Matches Completed", icon: <Award size={11} /> },
                     { id: "share_click", label: "Share Clicks", icon: <Share2 size={11} /> },
+                    { id: "signups", label: "Sign Ups", icon: <Users size={11} /> },
                     { id: "all", label: "All Events", icon: <Activity size={11} /> },
                   ].map(metric => (
                     <button
