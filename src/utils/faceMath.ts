@@ -146,35 +146,66 @@ export interface MogScoreResult {
     canthalTilt: string;
     symmetry: string;
     jawline: string;
+    potential: string;
+    eyeShape: string;
   };
 }
 
 /**
- * Calculates a raw Mog Score for high-performance loops.
- * @returns {number} The 1-decimal mog score.
+ * PSL-calibrated Mog Score for high-performance loops.
+ * 
+ * Scale mirrors UMAX app scoring where the average person scores 4.5-5.5.
+ * - 1-4:   Below average (structural deficiencies)
+ * - 4-5.5: Average (most people)
+ * - 5.5-7: Above average
+ * - 7-8:   Attractive (top 15%)
+ * - 8-9:   Very attractive (top 5%)
+ * - 9+:    Exceptional (model-tier, extremely rare)
  */
 export function calculateMogScore(landmarks: Landmark[]): number {
   if (!landmarks || landmarks.length === 0) return 0;
 
-  // Calculate base score from structure (3.0 to 8.0)
-  const structureScore = calculateStructureScore(landmarks);
-  const baseScore = Math.min(8, Math.max(3, 3 + structureScore));
+  const tilt = calculateCanthalTilt(landmarks);
+  const symmetry = calculateSymmetry(landmarks);
+  const jawline = calculateJawlineRatio(landmarks);
 
-  // Reduced viral variance (max 0.5)
-  const viralVariance = Math.random() * 0.5;
+  // ── 1. Canthal Tilt ──────────────────────────────────────────────────────
+  // Typical humans: -3° to +3°. Positive is hunter-eyed. Ideal: +4° to +8°.
+  // Raw camera-estimated degrees are smaller than real degrees.
+  // Map so tilt=0 → 4.5pts, tilt=+5 → 6pts, tilt=-5 → 3pts
+  const tiltScore = Math.max(1.0, Math.min(10.0, 4.5 + tilt * 0.3));
 
-  // Final score capped at 9.9
-  const finalScore = Math.min(9.9, baseScore + viralVariance);
+  // ── 2. Facial Symmetry ───────────────────────────────────────────────────
+  // calculateSymmetry() returns 0-1.
+  // Humans typically range 0.85-0.99. Map to a 1-9.5 range.
+  // symmetry=0.95 → ~5.5 (average), symmetry=0.99 → ~7, symmetry=0.85 → ~4
+  const symmetryScore = Math.max(1.0, Math.min(10.0, (symmetry - 0.80) * 60));
 
-  // Clamp the authentic raw score to a realistic max of 9.9 and min of 1.0
-  const clampedScore = Math.max(1.0, Math.min(finalScore, 9.9));
+  // ── 3. Jaw/Chin Structure ────────────────────────────────────────────────
+  // calculateJawlineRatio() returns 0-1.
+  // Typical range: 0.55-0.80. Map so 0.65 → 5, 0.75 → 7, 0.55 → 3
+  const jawScore = Math.max(1.0, Math.min(10.0, (jawline - 0.40) * 18));
 
-  // Return the raw, unbuffed score formatted to 1 decimal place
-  return parseFloat(clampedScore.toFixed(1));
+  // ── Composite PSL score ──────────────────────────────────────────────────
+  // Weighted: symmetry matters most visually, then jaw structure, then eye tilt
+  const raw = tiltScore * 0.30 + symmetryScore * 0.40 + jawScore * 0.30;
+
+  // Apply a PSL penalty curve: compress upper range so 9+ is truly exceptional.
+  // Scores above 7 are halved in their excess above 7 to prevent score inflation.
+  let psl: number;
+  if (raw <= 7.0) {
+    psl = raw;
+  } else {
+    // Each point above 7 maps to only 0.6 additional points (diminishing gains)
+    psl = 7.0 + (raw - 7.0) * 0.6;
+  }
+
+  return parseFloat(Math.max(1.0, Math.min(9.9, psl)).toFixed(1));
 }
 
 /**
  * Calculates a detailed Mog Score with metrics for UI display.
+ * Potential score: realistic ceiling based on what could change (e.g. fitness, grooming).
  */
 export function calculateDetailedMogScore(landmarks: Landmark[]): MogScoreResult {
   const score = calculateMogScore(landmarks);
@@ -183,12 +214,23 @@ export function calculateDetailedMogScore(landmarks: Landmark[]): MogScoreResult
   const symmetry = calculateSymmetry(landmarks);
   const jawline = calculateJawlineRatio(landmarks);
 
+  // Realistic potential: genetics are fixed, but soft tissue/posture adds ~0.3-0.8
+  const potential = Math.min(9.9, score + Math.max(0.3, (9.9 - score) * 0.15)).toFixed(1);
+
+  let eyeShape = "Almond Eyes";
+  if (canthalTilt > 4) eyeShape = "Hunter Eyes";
+  else if (canthalTilt > 1.5) eyeShape = "Slightly Positive";
+  else if (canthalTilt < -2) eyeShape = "Droopy Eyes";
+  else if (canthalTilt < 0) eyeShape = "Neutral Tilt";
+
   return {
     score,
     metrics: {
       canthalTilt: canthalTilt.toFixed(2) + "°",
       symmetry: (symmetry * 100).toFixed(1) + "%",
       jawline: jawline.toFixed(2),
+      potential,
+      eyeShape
     },
   };
 }
@@ -292,20 +334,29 @@ export function detectTurnLeft(landmarks: Landmark[]): boolean {
   const leftCheek = getLandmark(landmarks, LANDMARKS.LEFT_CHEEK);
   const rightCheek = getLandmark(landmarks, LANDMARKS.RIGHT_CHEEK);
 
-  // Store initial position on first call
+  if (!noseTip || !leftCheek || !rightCheek) return false;
+
+  // 1. Cheek ratio method: horizontal distances from nose tip to each cheek
+  const leftDist = Math.abs(noseTip.x - leftCheek.x);
+  const rightDist = Math.abs(noseTip.x - rightCheek.x);
+  
+  if (leftDist > 0 && rightDist > 0) {
+    const ratio = leftDist / rightDist;
+    // When turning left (screen-left in mirrored stream), nose gets closer to left cheek boundary
+    if (ratio < 0.75) {
+      return true;
+    }
+  }
+
+  // 2. Fallback: nose movement relative to initial position
   if (initialNoseX === null) {
     initialNoseX = noseTip.x;
     return false;
   }
 
-  // Calculate how far nose has moved from initial position
   const noseMovement = noseTip.x - initialNoseX;
-
-  // When user turns head left (from camera perspective, mirroring),
-  // the nose moves toward the right side of the frame
-  // Threshold: significant movement means nose moved more than 15% of face width
   const faceWidth = rightCheek.x - leftCheek.x;
-  const threshold = faceWidth * 0.15;
+  const threshold = faceWidth * 0.08; // Optimized from 0.15 to 0.08 for faster response
 
   return noseMovement < -threshold;
 }

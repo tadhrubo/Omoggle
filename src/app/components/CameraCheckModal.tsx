@@ -27,16 +27,48 @@ export default function CameraCheckModal({ isOpen, onComplete, onExit }: CameraC
 
   const { detect, isLoaded } = useFaceScanner({ enabled: isOpen });
 
+  const currentStepRef = useRef(0);
+  const isLoadedRef = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+
+  useEffect(() => {
+    currentStepRef.current = currentStep;
+  }, [currentStep]);
+
+  useEffect(() => {
+    isLoadedRef.current = isLoaded;
+  }, [isLoaded]);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
   useEffect(() => {
     if (!isOpen) return;
     let stream: MediaStream | null = null;
     resetLivenessState();
+
+    // Reset local verification flags and state
+    blinkDetectedRef.current = false;
+    turnDetectedRef.current = false;
+    alignCompletedRef.current = false;
+    setCurrentStep(0);
+    setProgress(0);
+    setStreamActive(false);
+    setError(null);
+    if (doneTimeoutRef.current) {
+      clearTimeout(doneTimeoutRef.current);
+      doneTimeoutRef.current = null;
+    }
 
     const startCam = async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          // Explicitly call play to bypass browser autoplay restrictions
+          await videoRef.current.play().catch((e) => console.warn("Video play failed:", e));
+          setStreamActive(true);
         }
       } catch (err) {
         console.error("Camera fail:", err);
@@ -54,9 +86,17 @@ export default function CameraCheckModal({ isOpen, onComplete, onExit }: CameraC
 
   const handleVideoReady = () => {
     setStreamActive(true);
+  };
+
+  useEffect(() => {
+    if (!isOpen || !streamActive) return;
+
+    let active = true;
 
     const renderLoop = () => {
-      if (videoRef.current && canvasRef.current && isLoaded) {
+      if (!active) return;
+
+      if (videoRef.current && canvasRef.current && isLoadedRef.current) {
         const video = videoRef.current;
         const canvas = canvasRef.current;
 
@@ -121,26 +161,28 @@ export default function CameraCheckModal({ isOpen, onComplete, onExit }: CameraC
             });
             ctx.globalAlpha = 1;
 
+            const step = currentStepRef.current;
+
             // Step logic
-            if (currentStep === 0 && !alignCompletedRef.current) {
+            if (step === 0 && !alignCompletedRef.current) {
               if (checkFaceCentered(landmarks)) {
                 alignCompletedRef.current = true;
                 setCurrentStep(1);
               }
-            } else if (currentStep === 1 && !blinkDetectedRef.current) {
+            } else if (step === 1 && !blinkDetectedRef.current) {
               if (detectBlink(landmarks)) {
                 blinkDetectedRef.current = true;
                 setCurrentStep(2);
               }
-            } else if (currentStep === 2 && !turnDetectedRef.current) {
+            } else if (step === 2 && !turnDetectedRef.current) {
               if (detectTurnLeft(landmarks)) {
                 turnDetectedRef.current = true;
                 setCurrentStep(3);
               }
-            } else if (currentStep === 3) {
+            } else if (step === 3) {
               setProgress(100);
               if (!doneTimeoutRef.current) {
-                doneTimeoutRef.current = setTimeout(onComplete, 1000);
+                doneTimeoutRef.current = setTimeout(onCompleteRef.current, 1000);
               }
             }
           }
@@ -150,7 +192,12 @@ export default function CameraCheckModal({ isOpen, onComplete, onExit }: CameraC
     };
 
     requestRef.current = requestAnimationFrame(renderLoop);
-  };
+
+    return () => {
+      active = false;
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    };
+  }, [isOpen, streamActive, detect]);
 
   useEffect(() => {
     const interval = setInterval(() => {

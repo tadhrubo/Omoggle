@@ -53,3 +53,28 @@ export function getPrestigeRankInfo(elo: number): RankGroup {
 export function getPrestigeRank(elo: number): string {
   return getPrestigeRankInfo(elo).name;
 }
+
+// ─── PSL-native rank for Solo Calibration (score 1-10) ───────────────────────
+export interface PSLRank {
+  name: string;
+  color: string;
+  bg: string;
+  border: string;
+  glow: boolean;
+  tier: string; // short descriptor
+}
+
+const PSL_RANKS: Array<{ min: number } & PSLRank> = [
+  { min: 9.0, name: "GOAT TIER",   tier: "Top 0.1%",  color: "#ffffff", bg: "linear-gradient(135deg, #09090b 0%, #1e1b4b 50%, #311042 100%)", border: "#ffffff", glow: true },
+  { min: 8.0, name: "CHAD",        tier: "Top 3%",    color: "#fbbf24", bg: "linear-gradient(135deg, #09090b 0%, #78350f 50%, #451a03 100%)", border: "#fbbf24", glow: true },
+  { min: 7.0, name: "ABOVE AVG",   tier: "Top 15%",   color: "#c084fc", bg: "linear-gradient(135deg, #09090b 0%, #581c87 100%)",               border: "#c084fc", glow: true },
+  { min: 6.0, name: "DECENT",      tier: "Top 30%",   color: "#38bdf8", bg: "linear-gradient(135deg, #09090b 0%, #0c4a6e 100%)",               border: "#38bdf8", glow: false },
+  { min: 5.0, name: "AVERAGE",     tier: "Middle 40%", color: "#22c55e", bg: "linear-gradient(135deg, #09090b 0%, #064e3b 100%)",              border: "#22c55e", glow: false },
+  { min: 4.0, name: "BELOW AVG",   tier: "Bottom 40%", color: "#9ca3af", bg: "linear-gradient(135deg, #09090b 0%, #374151 100%)",              border: "#9ca3af", glow: false },
+  { min: 2.5, name: "NPC MODE",    tier: "Bottom 20%", color: "#6b7280", bg: "linear-gradient(135deg, #09090b 0%, #1f2937 100%)",              border: "#6b7280", glow: false },
+  { min: 0,   name: "RECESSED",    tier: "Bottom 5%",  color: "#4b5563", bg: "linear-gradient(135deg, #050505 0%, #111827 100%)",              border: "#4b5563", glow: false },
+];
+
+export function getPSLRankInfo(score: number): PSLRank {
+  return PSL_RANKS.find(r => score >= r.min) ?? PSL_RANKS[PSL_RANKS.length - 1];
+}

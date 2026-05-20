@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import ShareCard from "@/components/ShareCard";
 import { toPng } from "html-to-image";
+import { safeCopyToClipboard } from "@/utils/clipboard";
 
 const SLEEK_INDICES = [10, 152, 234, 454, 132, 361, 33, 263, 4, 61, 291];
 
@@ -92,6 +93,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const scoreHistoryRef = useRef<number[]>([]);
   const cardRef = useRef<HTMLDivElement>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleDownloadCard = async () => {
     if (!cardRef.current) return;
@@ -110,27 +112,46 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
   const handleNativeShare = async () => {
     if (!cardRef.current) return;
     setIsSharing(true);
+    let dataUrl = "";
     try {
-      const dataUrl = await toPng(cardRef.current, { quality: 0.9, pixelRatio: 1, skipAutoScale: true, cacheBust: true });
+      dataUrl = await toPng(cardRef.current, { quality: 0.9, pixelRatio: 1, skipAutoScale: true, cacheBust: true });
       const res = await fetch(dataUrl);
       const blob = await res.blob();
       const file = new File([blob], "mog-victory.png", { type: "image/png" });
 
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           title: 'Mog Battle Result',
           text: 'I just faced the scanner. Do you have the genetics to beat my score?',
           files: [file]
         });
       } else {
+        // Direct download fallback
+        const link = document.createElement('a');
+        link.download = `omoggle-victory-${Date.now()}.png`;
+        link.href = dataUrl;
+        link.click();
+        
+        // Copy text to clipboard as a companion
+        const shareText = `I just got a Mog Score of ${(myScore || 0).toFixed(1)} on Omoggle! Can you beat me?`;
+        await safeCopyToClipboard(shareText);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    } catch (err) {
+      console.warn("Share failed, falling back to download and clipboard copy:", err);
+      if (dataUrl) {
         const link = document.createElement('a');
         link.download = `omoggle-victory-${Date.now()}.png`;
         link.href = dataUrl;
         link.click();
       }
-    } catch (err) {
-      console.error("Share failed:", err);
-      alert("Could not generate image. Your browser might be blocking it.");
+      const shareText = `I just got a Mog Score of ${(myScore || 0).toFixed(1)} on Omoggle! Can you beat me?`;
+      const copiedOk = await safeCopyToClipboard(shareText);
+      if (copiedOk) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
     } finally {
       setIsSharing(false);
     }
@@ -390,8 +411,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
               disabled={isSharing}
               style={{ 
                 padding: "12px 24px", 
-                backgroundColor: "#a855f7", 
-                color: "white", 
+                backgroundColor: copied ? "#39FF14" : "#a855f7", 
+                color: copied ? "black" : "white", 
                 border: "none", 
                 borderRadius: "8px", 
                 fontWeight: "bold", 
@@ -408,7 +429,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
                   <div style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%", animation: "spin 0.6s linear infinite" }}></div>
                   PREPARING...
                 </>
-              ) : "SHARE RESULT"}
+              ) : copied ? "LINK COPIED!" : "SHARE RESULT"}
             </button>
           </div>
 
