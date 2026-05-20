@@ -71,7 +71,14 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect, onRem
     const init = async () => {
       try {
         // 1. Get camera
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+  video: { 
+    width: { ideal: 320 }, 
+    height: { ideal: 240 }, 
+    frameRate: { ideal: 15 } 
+  }, 
+  audio: false 
+});
         if (!isMounted) {
           stream.getTracks().forEach(track => track.stop());
           return;

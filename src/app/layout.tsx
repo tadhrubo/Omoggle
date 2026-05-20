@@ -173,11 +173,10 @@ const jsonLd = {
         height: 512,
       },
       sameAs: [
-        "https://twitter.com/omoggle",
-        "https://www.tiktok.com/@omoggle",
-        "https://www.youtube.com/@omoggle",
-        "https://discord.gg/omoggle",
-        "https://reddit.com/r/omoggle",
+        "https://www.instagram.com/omoggle.game/",
+        "https://www.facebook.com/profile.php?viewas=100000686899395&id=61590329630907",
+        "https://www.tiktok.com/@omoggle.games",
+        "https://www.youtube.com/@omogglegames"
       ],
     },
     {

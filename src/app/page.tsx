@@ -414,6 +414,52 @@ export default function Home() {
 
         {/* FAQ SECTION */}
         <FaqAccordion />
+
+        {/* --- FOOTER SECTION --- */}
+        <div style={{ marginTop: "100px", borderTop: "1px solid #27272a", paddingTop: "40px", display: "flex", flexDirection: "column", gap: "30px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "24px" }}>
+            {/* Branding */}
+            <div>
+              <span style={{ fontFamily: "var(--font-bebas)", fontSize: "2.2rem", letterSpacing: "2px", color: "white" }}>OMOGGLE</span>
+              <p style={{ color: "#71717a", fontSize: "12px", margin: "5px 0 0 0", fontFamily: "monospace" }}>THE COMPETITIVE MOG ARENA</p>
+            </div>
+
+            {/* Navigation Links */}
+            <div style={{ display: "flex", gap: "25px", flexWrap: "wrap" }}>
+              <Link href="/leaderboard" style={{ color: "#a1a1aa", textDecoration: "none", fontSize: "13px", fontWeight: "600", transition: "color 0.2s" }} onMouseOver={(e) => e.currentTarget.style.color = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.color = "#a1a1aa"}>LEADERBOARD</Link>
+              <Link href="/ranks" style={{ color: "#a1a1aa", textDecoration: "none", fontSize: "13px", fontWeight: "600", transition: "color 0.2s" }} onMouseOver={(e) => e.currentTarget.style.color = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.color = "#a1a1aa"}>RANKS</Link>
+              <Link href="/faq" style={{ color: "#a1a1aa", textDecoration: "none", fontSize: "13px", fontWeight: "600", transition: "color 0.2s" }} onMouseOver={(e) => e.currentTarget.style.color = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.color = "#a1a1aa"}>FAQ</Link>
+              <Link href="/privacy-policy" style={{ color: "#a1a1aa", textDecoration: "none", fontSize: "13px", fontWeight: "600", transition: "color 0.2s" }} onMouseOver={(e) => e.currentTarget.style.color = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.color = "#a1a1aa"}>PRIVACY POLICY</Link>
+            </div>
+
+            {/* Social Icons */}
+            <div style={{ display: "flex", gap: "12px" }}>
+              {/* Instagram */}
+              <a href="https://www.instagram.com/omoggle.game/" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid #27272a", color: "#a1a1aa", transition: "all 0.2s" }} onMouseOver={(e) => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.color = "white"; e.currentTarget.style.transform = "translateY(-2px)"; }} onMouseOut={(e) => { e.currentTarget.style.borderColor = "#27272a"; e.currentTarget.style.color = "#a1a1aa"; e.currentTarget.style.transform = "none"; }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
+              </a>
+
+              {/* Facebook */}
+              <a href="https://www.facebook.com/profile.php?viewas=100000686899395&id=61590329630907" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid #27272a", color: "#a1a1aa", transition: "all 0.2s" }} onMouseOver={(e) => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.color = "white"; e.currentTarget.style.transform = "translateY(-2px)"; }} onMouseOut={(e) => { e.currentTarget.style.borderColor = "#27272a"; e.currentTarget.style.color = "#a1a1aa"; e.currentTarget.style.transform = "none"; }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+              </a>
+
+              {/* TikTok */}
+              <a href="https://www.tiktok.com/@omoggle.games" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid #27272a", color: "#a1a1aa", transition: "all 0.2s" }} onMouseOver={(e) => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.color = "white"; e.currentTarget.style.transform = "translateY(-2px)"; }} onMouseOut={(e) => { e.currentTarget.style.borderColor = "#27272a"; e.currentTarget.style.color = "#a1a1aa"; e.currentTarget.style.transform = "none"; }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/></svg>
+              </a>
+
+              {/* YouTube */}
+              <a href="https://www.youtube.com/@omogglegames" target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid #27272a", color: "#a1a1aa", transition: "all 0.2s" }} onMouseOver={(e) => { e.currentTarget.style.borderColor = "#ef4444"; e.currentTarget.style.color = "white"; e.currentTarget.style.transform = "translateY(-2px)"; }} onMouseOut={(e) => { e.currentTarget.style.borderColor = "#27272a"; e.currentTarget.style.color = "#a1a1aa"; e.currentTarget.style.transform = "none"; }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17z"/><polygon points="10 15 15 12 10 9"/></svg>
+              </a>
+            </div>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px", borderTop: "1px solid rgba(255,255,255,0.02)", paddingTop: "20px" }}>
+            <p style={{ color: "#52525b", fontSize: "11px", margin: 0 }}>© {new Date().getFullYear()} Omoggle. All rights reserved.</p>
+            <p style={{ color: "#52525b", fontSize: "11px", margin: 0 }}>Built for looksmaxxing & competitive genetic assessment.</p>
+          </div>
+        </div>
       </div>
 
       {/* --- SETTINGS MODAL --- */}

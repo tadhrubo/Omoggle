@@ -213,7 +213,14 @@ export function useMatchmaker({ mode = "casual", playerElo = 1200, onDisconnect,
     let isMounted = true;
     const init = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+  video: { 
+    width: { ideal: 320 }, 
+    height: { ideal: 240 }, 
+    frameRate: { ideal: 15 } 
+  }, 
+  audio: false 
+});
         
         if (!isMounted) {
           stream.getTracks().forEach(track => track.stop());
