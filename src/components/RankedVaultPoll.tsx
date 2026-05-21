@@ -5,76 +5,43 @@ import { createClient } from "@/lib/supabase/client";
 export default function RankedVaultPoll() {
   const supabase = createClient();
   const [session, setSession] = useState<any>(null);
-  const [hasVoted, setHasVoted] = useState<boolean | null>(null);
-  const [totalVotes, setTotalVotes] = useState({ yes: 0, no: 0 });
-  const [isVoting, setIsVoting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
-
-      const { data: votes } = await supabase.from('ranked_votes').select('vote_yes');
-      if (votes) {
-        const yesCount = votes.filter(v => v.vote_yes).length;
-        const noCount = votes.filter(v => !v.vote_yes).length;
-        setTotalVotes({ yes: yesCount, no: noCount });
-      }
-
-      if (session?.user?.id) {
-        const { data: myVote } = await supabase
-          .from('ranked_votes')
-          .select('vote_yes')
-          .eq('user_id', session.user.id)
-          .single();
-        if (myVote) setHasVoted(myVote.vote_yes);
-      }
     };
     loadData();
   }, [supabase]);
 
-  const handleVote = async (isYes: boolean) => {
+  const handleCheckout = async () => {
     if (!session?.user?.id) return;
-    if (hasVoted === isYes) return;
-    setIsVoting(true);
+    setIsProcessing(true);
 
     try {
-      await supabase.from('ranked_votes').upsert({
-        user_id: session.user.id,
-        vote_yes: isYes
-      }, { onConflict: 'user_id' });
-
-      setTotalVotes(prev => {
-        let yesDelta = 0;
-        let noDelta = 0;
-
-        if (hasVoted === null) {
-          if (isYes) yesDelta = 1;
-          else noDelta = 1;
-        } else if (hasVoted === true && !isYes) {
-          yesDelta = -1;
-          noDelta = 1;
-        } else if (hasVoted === false && isYes) {
-          yesDelta = 1;
-          noDelta = -1;
-        }
-
-        return {
-          yes: prev.yes + yesDelta,
-          no: prev.no + noDelta
-        };
+      const response = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: session.user.id }),
       });
 
-      setHasVoted(isYes);
+      const data = await response.json();
+
+      if (data.invoice_url) {
+        // Redirect to the NOWPayments invoice URL
+        window.location.href = data.invoice_url;
+      } else {
+        console.error("Failed to retrieve invoice:", data.error);
+        alert("Failed to initialize checkout. Please try again.");
+      }
     } catch (error) {
-      console.error("Vote failed:", error);
+      console.error("Checkout failed:", error);
+      alert("Something went wrong. Please check your connection.");
     } finally {
-      setIsVoting(false);
+      setIsProcessing(false);
     }
   };
-
-  const total = totalVotes.yes + totalVotes.no;
-  const yesPercentage = total > 0 ? Math.round((totalVotes.yes / total) * 100) : 0;
 
   return (
     <div style={{ backgroundColor: "#09090b", border: "1px solid #27272a", borderRadius: "12px", padding: "30px", maxWidth: "600px", margin: "0 auto", textAlign: "center" }}>
@@ -85,13 +52,13 @@ export default function RankedVaultPoll() {
       <h2 style={{ color: "white", fontSize: "24px", fontWeight: "900", letterSpacing: "2px", margin: "0 0 10px 0" }}>RANKED MODE VAULTED</h2>
       <p style={{ color: "#a1a1aa", fontSize: "14px", lineHeight: "1.6", marginBottom: "30px" }}>
         Omoggle blew up. To keep the servers alive and the matchmaking fast, we've funneled everyone into Casual Mode. <br/><br/>
-        We are considering opening Ranked as a premium, high-stakes arena to fund the servers. Would you be interested?
+        Ranked access is now a premium feature. Upgrade to unlock high-stakes competitive play, global leaderboards, and exclusive prestige borders.
       </p>
 
       <div style={{ backgroundColor: "#18181b", borderRadius: "8px", padding: "20px", marginBottom: "20px" }}>
         {!session ? (
           <div>
-            <div style={{ color: "white", fontWeight: "bold", marginBottom: "15px" }}>Login required to vote and secure your beta spot.</div>
+            <div style={{ color: "white", fontWeight: "bold", marginBottom: "15px" }}>Login required to unlock Ranked Mode.</div>
             <button 
               onClick={async () => {
                 await supabase.auth.signInWithOAuth({
@@ -103,39 +70,21 @@ export default function RankedVaultPoll() {
               }} 
               style={{ padding: "12px 24px", backgroundColor: "#fbbf24", color: "black", fontWeight: "900", border: "none", borderRadius: "8px", cursor: "pointer", width: "100%" }}
             >
-              SIGN UP TO VOTE
+              SIGN UP TO CONTINUE
             </button>
           </div>
         ) : (
           <div>
-            <div style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
-              <button 
-                onClick={() => handleVote(true)}
-                disabled={isVoting || hasVoted === true}
-                style={{ flex: "1 1 200px", padding: "15px", backgroundColor: hasVoted === true ? "#fbbf24" : "#27272a", color: hasVoted === true ? "black" : "white", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: (isVoting || hasVoted === true) ? "not-allowed" : "pointer", transition: "all 0.2s", opacity: hasVoted === false ? 0.6 : 1 }}
-              >
-                YES, I'D PAY FOR RANKED
-              </button>
-              <button 
-                onClick={() => handleVote(false)}
-                disabled={isVoting || hasVoted === false}
-                style={{ flex: "1 1 200px", padding: "15px", backgroundColor: hasVoted === false ? "#ef4444" : "#27272a", color: "white", fontWeight: "bold", border: "none", borderRadius: "8px", cursor: (isVoting || hasVoted === false) ? "not-allowed" : "pointer", transition: "all 0.2s", opacity: hasVoted === true ? 0.6 : 1 }}
-              >
-                NO, KEEP IT CASUAL
-              </button>
+            <button 
+              onClick={handleCheckout}
+              disabled={isProcessing}
+              style={{ width: "100%", padding: "15px", backgroundColor: "#fbbf24", color: "black", fontWeight: "900", border: "none", borderRadius: "8px", cursor: isProcessing ? "wait" : "pointer", transition: "all 0.2s", opacity: isProcessing ? 0.7 : 1, fontSize: "16px", letterSpacing: "1px" }}
+            >
+              {isProcessing ? "INITIALIZING CHECKOUT..." : "PAY $2 FOR RANKED ACCESS"}
+            </button>
+            <div style={{ color: "#a1a1aa", fontSize: "12px", marginTop: "12px", fontWeight: "500" }}>
+              Secure crypto checkout via NOWPayments. Instant unlock upon network confirmation.
             </div>
-            
-            {hasVoted !== null && (
-              <div style={{ textAlign: "left" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "#a1a1aa", fontSize: "12px", marginBottom: "8px", fontWeight: "bold" }}>
-                  <span>YES ({yesPercentage}%)</span>
-                  <span>{total} Total Votes</span>
-                </div>
-                <div style={{ width: "100%", height: "8px", backgroundColor: "#27272a", borderRadius: "99px", overflow: "hidden" }}>
-                  <div style={{ width: `${yesPercentage}%`, height: "100%", backgroundColor: "#fbbf24", transition: "width 0.5s ease" }}></div>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
