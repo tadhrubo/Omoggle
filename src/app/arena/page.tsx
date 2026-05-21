@@ -108,6 +108,11 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
       link.download = `omoggle-victory-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
+      if (mode === "casual") {
+        trackEvent("casual_share_download");
+      } else {
+        trackEvent("share_click");
+      }
     } catch (err) {
       console.error('Failed to generate card', err);
       alert('Could not generate image. Please try again.');
@@ -130,6 +135,11 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
           text: 'I just faced the scanner. Do you have the genetics to beat my score?',
           files: [file]
         });
+        if (mode === "casual") {
+          trackEvent("casual_share_social");
+        } else {
+          trackEvent("share_click");
+        }
       } else {
         // Direct download fallback
         const link = document.createElement('a');
@@ -142,6 +152,12 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
         await safeCopyToClipboard(shareText);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+
+        if (mode === "casual") {
+          trackEvent("casual_share_download");
+        } else {
+          trackEvent("share_click");
+        }
       }
     } catch (err) {
       console.warn("Share failed, falling back to download and clipboard copy:", err);
@@ -156,6 +172,11 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
       if (copiedOk) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+      }
+      if (mode === "casual") {
+        trackEvent("casual_share_download");
+      } else {
+        trackEvent("share_click");
       }
     } finally {
       setIsSharing(false);
@@ -211,10 +232,14 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
       telemetryRef.current("PROFILE_SYNC", { profile: localProfile });
       setBattlePhase('connected');
       setCountdown(5);
-      trackEvent("battle_join");
+      if (mode === "casual") {
+        trackEvent("casual_battle_join");
+      } else {
+        trackEvent("battle_join");
+      }
       setTimeout(() => setBattlePhase("countdown"), 1000);
     }
-  }, [isConnected, isDataConnected, battlePhase, localProfile, trackEvent]);
+  }, [isConnected, isDataConnected, battlePhase, localProfile, trackEvent, mode]);
 
   useEffect(() => {
     if (battlePhase === "countdown" && countdown === 0 && myScore === null) {
@@ -223,7 +248,11 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
       setMyScore(finalScore);
       telemetryRef.current("FINAL_SCORE", { score: finalScore });
       setBattlePhase("result");
-      trackEvent("battle_complete");
+      if (mode === "casual") {
+        trackEvent("casual_battle_complete");
+      } else {
+        trackEvent("battle_complete");
+      }
 
       const isWinner = finalScore > (opponentScore || 0);
       playResultSound(isWinner);

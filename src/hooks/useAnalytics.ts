@@ -17,7 +17,16 @@ export function useAnalytics() {
   };
 
   const trackEvent = useCallback(
-    (eventType: "session_start" | "battle_join" | "battle_complete" | "share_click") => {
+    (eventType: 
+      | "session_start" 
+      | "battle_join" 
+      | "battle_complete" 
+      | "share_click"
+      | "casual_battle_join"
+      | "casual_battle_complete"
+      | "casual_share_download"
+      | "casual_share_social"
+    ) => {
       const userId = getUserId();
       
       // Fire and forget. No await.

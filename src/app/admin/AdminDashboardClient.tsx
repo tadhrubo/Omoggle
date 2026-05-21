@@ -34,7 +34,15 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface AnalyticsEvent {
   id: string;
-  event_type: "session_start" | "battle_join" | "battle_complete" | "share_click";
+  event_type: 
+    | "session_start" 
+    | "battle_join" 
+    | "battle_complete" 
+    | "share_click"
+    | "casual_battle_join"
+    | "casual_battle_complete"
+    | "casual_share_download"
+    | "casual_share_social";
   user_id: string;
   created_at: string;
 }
@@ -88,7 +96,16 @@ export default function AdminDashboardClient({
 
   const [timeRange, setTimeRange] = useState<"24h" | "30d" | "12w" | "12m">("30d");
   const [activeMetric, setActiveMetric] = useState<
-    "session_start" | "battle_join" | "battle_complete" | "share_click" | "signups" | "all"
+    | "session_start"
+    | "battle_join"
+    | "battle_complete"
+    | "share_click"
+    | "signups"
+    | "all"
+    | "casual_battle_join"
+    | "casual_battle_complete"
+    | "casual_share_download"
+    | "casual_share_social"
   >("session_start");
   const [chartType, setChartType] = useState<"line" | "bar">("line");
   const [hoveredPoint, setHoveredPoint] = useState<{
@@ -271,6 +288,53 @@ export default function AdminDashboardClient({
   }, [filteredMatches, matchesPage]);
 
   const maxMatchesPage = Math.ceil(filteredMatches.length / matchesPerPage) || 1;
+
+  // --- METRIC THEME COLOR MAP ---
+  const getMetricColor = (metricId: string) => {
+    if (metricId.startsWith("casual_")) return "#3b82f6"; // Blue
+    if (metricId === "session_start") return "#a1a1aa"; // Zinc
+    if (metricId === "signups") return "#a855f7"; // Purple
+    return "#ef4444"; // Red for ranked/all
+  };
+
+  const getMetricColors = (metricId: string) => {
+    if (metricId.startsWith("casual_")) {
+      return {
+        accent: "#3b82f6", // Blue
+        accentDark: "#1d4ed8",
+        accentDarker: "#172554",
+        glowColor: "#3b82f6",
+        bgGradient: "from-blue-500 to-indigo-400"
+      };
+    }
+    if (metricId === "session_start") {
+      return {
+        accent: "#a1a1aa", // Zinc
+        accentDark: "#71717a",
+        accentDarker: "#27272a",
+        glowColor: "#a1a1aa",
+        bgGradient: "from-zinc-500 to-zinc-400"
+      };
+    }
+    if (metricId === "signups") {
+      return {
+        accent: "#a855f7", // Purple
+        accentDark: "#7e22ce",
+        accentDarker: "#3b0764",
+        glowColor: "#a855f7",
+        bgGradient: "from-purple-500 to-fuchsia-400"
+      };
+    }
+    return {
+      accent: "#ef4444", // Red
+      accentDark: "#b91c1c",
+      accentDarker: "#450a0a",
+      glowColor: "#ef4444",
+      bgGradient: "from-red-500 to-rose-400"
+    };
+  };
+
+  const metricColors = useMemo(() => getMetricColors(activeMetric), [activeMetric]);
 
   // --- TIME GROUPING & FILTERING LOGIC ---
   const chartData = useMemo(() => {
@@ -503,6 +567,14 @@ export default function AdminDashboardClient({
         return <span className="px-2.5 py-1 rounded text-[9px] font-bold border border-green-900 bg-green-950/40 text-green-400 tracking-wider">BATTLE COMP</span>;
       case "share_click":
         return <span className="px-2.5 py-1 rounded text-[9px] font-bold border border-purple-900 bg-purple-950/40 text-purple-400 tracking-wider">SHARE CLICK</span>;
+      case "casual_battle_join":
+        return <span className="px-2.5 py-1 rounded text-[9px] font-bold border border-blue-900 bg-blue-950/40 text-blue-400 tracking-wider">CASUAL JOIN</span>;
+      case "casual_battle_complete":
+        return <span className="px-2.5 py-1 rounded text-[9px] font-bold border border-indigo-900 bg-indigo-950/40 text-indigo-400 tracking-wider">CASUAL COMP</span>;
+      case "casual_share_download":
+        return <span className="px-2.5 py-1 rounded text-[9px] font-bold border border-sky-900 bg-sky-950/40 text-sky-400 tracking-wider">CASUAL DL</span>;
+      case "casual_share_social":
+        return <span className="px-2.5 py-1 rounded text-[9px] font-bold border border-emerald-900 bg-emerald-950/40 text-emerald-400 tracking-wider">CASUAL SHARE</span>;
       default:
         return null;
     }
@@ -691,9 +763,13 @@ export default function AdminDashboardClient({
                 <div className="flex flex-wrap p-0.5 bg-zinc-950 border border-zinc-800 rounded-xl gap-0.5 max-w-full">
                   {[
                     { id: "session_start", label: "Sessions", icon: <Clock size={11} /> },
-                    { id: "battle_join", label: "Battles Joined", icon: <Sword size={11} /> },
-                    { id: "battle_complete", label: "Matches Completed", icon: <Award size={11} /> },
-                    { id: "share_click", label: "Share Clicks", icon: <Share2 size={11} /> },
+                    { id: "battle_join", label: "Ranked Joins", icon: <Sword size={11} /> },
+                    { id: "battle_complete", label: "Ranked Completed", icon: <Award size={11} /> },
+                    { id: "share_click", label: "Ranked Shares", icon: <Share2 size={11} /> },
+                    { id: "casual_battle_join", label: "Casual Joins", icon: <Sword size={11} /> },
+                    { id: "casual_battle_complete", label: "Casual Completed", icon: <Award size={11} /> },
+                    { id: "casual_share_download", label: "Casual Downloads", icon: <Share2 size={11} /> },
+                    { id: "casual_share_social", label: "Casual Shares", icon: <Share2 size={11} /> },
                     { id: "signups", label: "Sign Ups", icon: <Users size={11} /> },
                     { id: "all", label: "All Events", icon: <Activity size={11} /> },
                   ].map(metric => (
@@ -705,9 +781,12 @@ export default function AdminDashboardClient({
                       }}
                       className={`flex items-center gap-1.5 px-3 py-2 text-[10px] font-bold rounded-lg transition-all flex-shrink-0 cursor-pointer ${
                         activeMetric === metric.id
-                          ? "bg-zinc-900 border border-zinc-800 text-red-500 shadow-md"
+                          ? "bg-zinc-900 border border-zinc-800 shadow-md"
                           : "text-zinc-500 hover:text-zinc-300"
                       }`}
+                      style={{
+                        color: activeMetric === metric.id ? getMetricColor(metric.id) : undefined
+                      }}
                     >
                       {metric.icon}
                       <span>{metric.label}</span>
@@ -767,15 +846,15 @@ export default function AdminDashboardClient({
                 >
                   <defs>
                     <linearGradient id="lineGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#ef4444" stopOpacity="0.2" />
-                      <stop offset="100%" stopColor="#ef4444" stopOpacity="0.0" />
+                      <stop offset="0%" stopColor={metricColors.accent} stopOpacity="0.2" />
+                      <stop offset="100%" stopColor={metricColors.accent} stopOpacity="0.0" />
                     </linearGradient>
                     <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#ef4444" stopOpacity="0.75" />
-                      <stop offset="100%" stopColor="#991b1b" stopOpacity="0.15" />
+                      <stop offset="0%" stopColor={metricColors.accent} stopOpacity="0.75" />
+                      <stop offset="100%" stopColor={metricColors.accentDark} stopOpacity="0.15" />
                     </linearGradient>
                     <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
-                      <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#ef4444" floodOpacity="0.4" />
+                      <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor={metricColors.glowColor} floodOpacity="0.4" />
                     </filter>
                   </defs>
 
@@ -817,7 +896,7 @@ export default function AdminDashboardClient({
                       <path
                         d={linePath}
                         fill="none"
-                        stroke="#ef4444"
+                        stroke={metricColors.accent}
                         strokeWidth="3"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -832,7 +911,7 @@ export default function AdminDashboardClient({
                           cy={p.y}
                           r={hoveredPoint?.index === i ? "6" : "3.5"}
                           fill={hoveredPoint?.index === i ? "#ffffff" : "#09090b"}
-                          stroke={hoveredPoint?.index === i ? "#ef4444" : "#b91c1c"}
+                          stroke={hoveredPoint?.index === i ? metricColors.accent : metricColors.accentDark}
                           strokeWidth={hoveredPoint?.index === i ? "3" : "2"}
                           className="cursor-pointer transition-all duration-100"
                           onMouseEnter={() => {
@@ -861,10 +940,10 @@ export default function AdminDashboardClient({
                           width={barWidth}
                           height={Math.max(barHeight, 2)}
                           fill="url(#barGradient)"
-                          stroke="#ef4444"
+                          stroke={metricColors.accent}
                           strokeWidth="1"
                           rx="2"
-                          className="cursor-pointer transition-all duration-150 hover:fill-red-400/20"
+                          className="cursor-pointer transition-all duration-150 hover:opacity-80"
                           onMouseEnter={() => {
                             setHoveredPoint({
                               label: p.label,
@@ -909,12 +988,14 @@ export default function AdminDashboardClient({
                       left: `${(hoveredPoint.x / svgParams.width) * 100}%`,
                       top: `${(hoveredPoint.y / svgParams.height) * 100 - 15}%`,
                       transform: "translate(-50%, -100%)",
+                      borderColor: `${metricColors.accent}cc`,
+                      boxShadow: `0 0 20px ${metricColors.accent}40`,
                     }}
-                    className="pointer-events-none z-30 min-w-[120px] px-3 py-2 bg-black border border-red-500/80 rounded-xl shadow-[0_0_20px_rgba(239,68,68,0.25)] backdrop-blur-md transition-all duration-75"
+                    className="pointer-events-none z-30 min-w-[120px] px-3 py-2 bg-black border rounded-xl backdrop-blur-md transition-all duration-75"
                   >
                     <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">{hoveredPoint.label}</p>
                     <div className="flex items-center gap-1.5 text-white font-extrabold text-base">
-                      <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: metricColors.accent }}></span>
                       {hoveredPoint.value} <span className="text-[10px] text-zinc-400 font-normal font-sans">EVENTS</span>
                     </div>
                   </div>

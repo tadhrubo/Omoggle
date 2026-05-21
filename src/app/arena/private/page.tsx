@@ -103,6 +103,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
       link.download = `omoggle-victory-${Date.now()}.png`;
       link.href = dataUrl;
       link.click();
+      trackEvent("casual_share_download");
     } catch (err) {
       console.error('Failed to generate card', err);
       alert('Could not generate image. Please try again.');
@@ -125,6 +126,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
           text: 'I just faced the scanner. Do you have the genetics to beat my score?',
           files: [file]
         });
+        trackEvent("casual_share_social");
       } else {
         // Direct download fallback
         const link = document.createElement('a');
@@ -137,6 +139,8 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         await safeCopyToClipboard(shareText);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+
+        trackEvent("casual_share_download");
       }
     } catch (err) {
       console.warn("Share failed, falling back to download and clipboard copy:", err);
@@ -152,6 +156,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }
+      trackEvent("casual_share_download");
     } finally {
       setIsSharing(false);
     }
@@ -231,7 +236,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
       telemetryRef.current("PROFILE_SYNC", { profile: localProfile });
       setPhase('PREP');
       setTimer(5);
-      trackEvent("battle_join");
+      trackEvent("casual_battle_join");
     }
   }, [isConnected, isDataConnected, phase, localProfile, trackEvent]);
 
@@ -365,7 +370,7 @@ function PrivateArenaCore({ roomCode, localProfile }: { roomCode: string; localP
       setPhase("RESULT");
       const isWinner = myScore > opponentScore;
       playResultSound(isWinner);
-      trackEvent("battle_complete");
+      trackEvent("casual_battle_complete");
     }
   }, [myScore, opponentScore, trackEvent]);
 
