@@ -6,13 +6,79 @@ import { Swords, Trophy, BarChart3, ShieldCheck, Star, MessageCircle, Send, X, C
 import Link from "next/link";
 import Image from "next/image";
 import SupportDeveloperModal from "@/components/SupportDeveloperModal";
-
-
+import { usePresence } from "@/hooks/usePresence";
 import { RANK_GROUPS, getPrestigeRankInfo } from "@/utils/eloMath";
 
 const getRankStyle = (tierName: string) => {
+  if (tierName === "SYSTEM") {
+    return {
+      name: "SYSTEM",
+      color: "#fca5a5",
+      glow: "0 0 10px rgba(239, 68, 68, 0.4)",
+      bg: "transparent",
+      border: "#ef4444"
+    };
+  }
   return RANK_GROUPS.find(r => r.name === tierName) || RANK_GROUPS[RANK_GROUPS.length - 1];
 };
+
+const getWeeklyPercentile = (elo: number) => {
+  if (elo >= 2500) return "TOP 0.1%";
+  if (elo >= 2200) return `TOP ${(1.5 - ((elo - 2200) / 300) * 1.4).toFixed(2)}%`;
+  if (elo >= 1900) return `TOP ${(5 - ((elo - 1900) / 300) * 3.5).toFixed(1)}%`;
+  if (elo >= 1600) return `TOP ${(15 - ((elo - 1600) / 300) * 10).toFixed(1)}%`;
+  if (elo >= 1300) return `TOP ${(30 - ((elo - 1300) / 300) * 15).toFixed(0)}%`;
+  if (elo >= 1000) return `TOP ${(50 - ((elo - 1000) / 300) * 20).toFixed(0)}%`;
+  if (elo >= 750) return `TOP ${(70 - ((elo - 750) / 250) * 20).toFixed(0)}%`;
+  if (elo >= 500) return `TOP ${(85 - ((elo - 500) / 250) * 15).toFixed(0)}%`;
+  return "TOP 95%";
+};
+
+function getEloProgress(elo: number) {
+  const currentIndex = RANK_GROUPS.findIndex(r => elo >= r.minElo);
+  const currentRank = RANK_GROUPS[currentIndex] || RANK_GROUPS[RANK_GROUPS.length - 1];
+  
+  if (currentIndex === 0 || currentIndex === -1) {
+    return {
+      percent: 100,
+      nextMinElo: "MAX",
+      currentMinElo: currentRank.minElo,
+      nextRankName: "MAX"
+    };
+  }
+  
+  const nextRank = RANK_GROUPS[currentIndex - 1];
+  const range = nextRank.minElo - currentRank.minElo;
+  const currentDiff = elo - currentRank.minElo;
+  const percent = Math.min(100, Math.max(0, (currentDiff / range) * 100));
+  
+  return {
+    percent,
+    nextMinElo: nextRank.minElo,
+    currentMinElo: currentRank.minElo,
+    nextRankName: nextRank.name
+  };
+}
+
+const RANK_DETAILS: Record<string, { pct: string, aura: string, reward: string }> = {
+  "TRUE ADAM": { pct: "Top 0.1%", aura: "Aura Level 10", reward: "Crown (Red Name Glow)" },
+  "TERRACHAD": { pct: "Top 1.5%", aura: "Aura Level 9", reward: "Amber Sparkle Border" },
+  "CHAD": { pct: "Top 5%", aura: "Aura Level 8", reward: "Crimson Pulse Badge" },
+  "CHADLITE": { pct: "Top 15%", aura: "Aura Level 7", reward: "Purple Aura Glow" },
+  "HTN": { pct: "Top 30%", aura: "Aura Level 6", reward: "Blue Shield Frame" },
+  "MTN": { pct: "Top 50%", aura: "Aura Level 5", reward: "Green Rank Icon" },
+  "LTN": { pct: "Top 70%", aura: "Aura Level 4", reward: "Blue Outline Banner" },
+  "SUB5": { pct: "Bottom 30%", aura: "Aura Level 3", reward: "Gray Border Frame" },
+  "NPC": { pct: "Bottom 15%", aura: "Aura Level 2", reward: "Default Avatar Frame" },
+  "DOOMER": { pct: "Bottom 5%", aura: "Aura Level 1", reward: "Doomer Background" }
+};
+
+const RANDOM_MOGGERS = [
+  "VOIDREAPER", "MIDNIGHTKING", "TERRACHAD", "VOIDRUNNER", "ZEPHYR", "CRIMSON", 
+  "CHADGIGANTE", "AURA_GOD", "ELITE_MOGGER", "SHADOW_CHAD", "DHRUBO", "GHOST", 
+  "NEOMOGGER", "ALPHA_OMEGA", "GIGACHAD", "Slayer", "Spectre", "Kaelen", "Kratos",
+  "Xenon", "Viper", "Raptor", "Zenith", "Phoenix", "Nova", "Apex", "Shadow"
+];
 
 export default function Lobby() {
   const router = useRouter();
@@ -22,10 +88,19 @@ export default function Lobby() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUsername, setCurrentUsername] = useState<string>("Guest");
   const [currentTier, setCurrentTier] = useState<string>("LTN");
+  const [currentStreak, setCurrentStreak] = useState<number>(0);
+  const [highestStreak, setHighestStreak] = useState<number>(0);
+  const [isSupporter, setIsSupporter] = useState<boolean>(false);
+  const [currentElo, setCurrentElo] = useState<number>(1000);
+  const [supporterUserIds, setSupporterUserIds] = useState<Set<string>>(new Set());
+  const [rankedQueueCount, setRankedQueueCount] = useState(218);
+  const [liveActivities, setLiveActivities] = useState<any[]>([]);
+  
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+  const { onlineCount } = usePresence();
 
   // Private Room State
   const [isPrivateModalOpen, setIsPrivateModalOpen] = useState(false);
@@ -70,6 +145,57 @@ export default function Lobby() {
     });
   };
 
+  const generateRandomEvent = (names: string[]) => {
+    const pickRandom = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
+    const p1 = pickRandom(names);
+    let p2 = pickRandom(names);
+    while (p2 === p1) {
+      p2 = pickRandom(names);
+    }
+    
+    const types = ["win", "rankup", "streakloss", "streakgain", "queue"];
+    const type = pickRandom(types);
+    
+    let text = "";
+    let highlight = "";
+    
+    switch(type) {
+      case "win":
+        const eloVal = Math.floor(Math.random() * 15) + 18;
+        text = `${p1} defeated ${p2} (+${eloVal} ELO)`;
+        highlight = `+${eloVal} ELO`;
+        break;
+      case "rankup":
+        const rank = pickRandom(["CHADLITE", "CHAD", "TERRACHAD", "TRUE ADAM", "HTN"]);
+        text = `${p1} reached ${rank} tier`;
+        highlight = rank;
+        break;
+      case "streakloss":
+        const lostStreak = Math.floor(Math.random() * 6) + 4;
+        text = `${p1} lost a ${lostStreak} win streak`;
+        highlight = `${lostStreak} win streak`;
+        break;
+      case "streakgain":
+        const streakVal = Math.floor(Math.random() * 7) + 3;
+        text = `${p1} is on a ${streakVal} win streak!`;
+        highlight = `${streakVal} win streak`;
+        break;
+      case "queue":
+      default:
+        text = `${p1} entered the Matchmaking Queue`;
+        highlight = "Queue";
+        break;
+    }
+    
+    return {
+      id: Math.random().toString(),
+      text,
+      type,
+      highlight,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    };
+  };
+
   // Fetch initial data
   useEffect(() => {
     const fetchData = async () => {
@@ -81,19 +207,32 @@ export default function Lobby() {
         .limit(10);
       if (leaders) setLeaderboard(leaders);
 
+      // Fetch all supporter IDs to show badges in chat
+      const { data: supporters } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('is_supporter', true);
+      if (supporters) {
+        setSupporterUserIds(new Set(supporters.map(s => s.id)));
+      }
+
       // Fetch current user and their recent matches
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setCurrentUserId(session.user.id);
         const { data: profile } = await supabase
             .from('profiles')
-            .select('username, elo')
+            .select('username, elo, current_streak, highest_streak, is_supporter')
             .eq('id', session.user.id)
             .single();
         
         if (profile) {
           setCurrentUsername(profile.username || "Mogger");
           setCurrentTier(getPrestigeRankInfo(profile.elo || 1200).name);
+          setCurrentStreak(profile.current_streak || 0);
+          setHighestStreak(profile.highest_streak || 0);
+          setIsSupporter(profile.is_supporter || false);
+          setCurrentElo(profile.elo || 1000);
         }
 
         const { data: matches } = await supabase
@@ -116,6 +255,48 @@ export default function Lobby() {
     fetchData();
   }, [supabase]);
 
+  // Set up live activities feed and system chat integration
+  useEffect(() => {
+    const getMockUsernames = () => {
+      const leaderboardNames = leaderboard.map(u => u.username).filter(Boolean);
+      return leaderboardNames.length > 0 ? leaderboardNames : RANDOM_MOGGERS;
+    };
+
+    const names = getMockUsernames();
+    const initial = Array.from({ length: 4 }).map(() => generateRandomEvent(names));
+    setLiveActivities(initial);
+
+    const interval = setInterval(() => {
+      const namesList = getMockUsernames();
+      const newEvent = generateRandomEvent(namesList);
+      setLiveActivities(prev => [newEvent, ...prev.slice(0, 3)]);
+      
+      // Inject system message into global chat locally to make it feel alive!
+      if (Math.random() > 0.4) {
+        setChatMessages(prev => [
+          ...prev.slice(1), // keep it capped at 50
+          {
+            id: "system-" + Date.now() + Math.random(),
+            username: "SYSTEM",
+            message: newEvent.text,
+            tier: "SYSTEM",
+            created_at: new Date().toISOString()
+          }
+        ]);
+      }
+    }, 6000);
+
+    return () => clearInterval(interval);
+  }, [leaderboard]);
+
+  // Queue fluctuations
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRankedQueueCount(prev => Math.max(180, Math.min(250, prev + Math.floor(Math.random() * 9) - 4)));
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Real-time chat subscription
   useEffect(() => {
     const channel = supabase
@@ -123,7 +304,7 @@ export default function Lobby() {
       .on(
         'postgres_changes', 
         { event: 'INSERT', schema: 'public', table: 'global_chat' }, 
-        (payload: any) => { // FIXED: Added explicit any type
+        (payload: any) => { 
           setChatMessages(prev => [...prev, payload.new]);
         }
       )
@@ -152,8 +333,50 @@ export default function Lobby() {
     if (e.key === "Enter") sendChatMessage();
   };
 
+  const progress = getEloProgress(currentElo);
+  const currentRank = getPrestigeRankInfo(currentElo);
+  const weeklyPercentile = getWeeklyPercentile(currentElo);
+
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#050505", color: "white", padding: "30px 16px", fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ minHeight: "100vh", backgroundColor: "#030303", color: "white", padding: "30px 16px", fontFamily: "'Inter', sans-serif" }}>
+      <style jsx global>{`
+        @keyframes pulseDot {
+          0% { transform: scale(0.95); opacity: 0.5; }
+          50% { transform: scale(1.15); opacity: 1; }
+          100% { transform: scale(0.95); opacity: 0.5; }
+        }
+        .online-pulse-dot {
+          animation: pulseDot 2s infinite ease-in-out;
+        }
+        .pulse-fast {
+          animation: pulseDot 1s infinite ease-in-out;
+        }
+        @keyframes flicker {
+          0% { transform: scale(1) rotate(0deg); opacity: 0.9; }
+          50% { transform: scale(1.1) rotate(-3deg); opacity: 1; filter: drop-shadow(0 0 8px #f97316); }
+          100% { transform: scale(1) rotate(2deg); opacity: 0.9; }
+        }
+        .flame-icon-active {
+          animation: flicker 0.15s infinite alternate;
+        }
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .rank-hierarchy-row {
+          position: relative;
+        }
+        .rank-hierarchy-row:hover .rank-tooltip {
+          opacity: 1 !important;
+          pointer-events: auto !important;
+          transform: translateY(-50%) translateX(-8px) !important;
+        }
+        @media (max-width: 900px) {
+          .rank-hierarchy-row:hover .rank-tooltip {
+            transform: translateX(-50%) translateY(-8px) !important;
+          }
+        }
+      `}</style>
       <style jsx>{`
         .lobby-container {
           max-width: 1000px;
@@ -223,23 +446,13 @@ export default function Lobby() {
             min-width: 0;
             justify-content: center;
           }
-          .mode-card {
-            padding: 20px !important;
-            gap: 15px !important;
-          }
-          .mode-card-icon {
-            padding: 10px !important;
-          }
-          .mode-card-title {
-            fontSize: 16px !important;
-          }
         }
       `}</style>
 
       <div className="lobby-container">
         
-        {/* Logo Button Row */}
-        <div style={{ padding: "10px 0 25px 0", display: "flex", justifyContent: "flex-start" }}>
+        {/* Logo Button Row with Online Pulse */}
+        <div style={{ padding: "10px 0 25px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Link href="/" style={{ display: "inline-flex", transition: "transform 0.2s ease" }}
             onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
             onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
@@ -257,6 +470,189 @@ export default function Lobby() {
               }}
             />
           </Link>
+
+          {/* Pulsing online player counter */}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            backgroundColor: "rgba(34, 197, 94, 0.05)",
+            border: "1px solid rgba(34, 197, 94, 0.2)",
+            padding: "8px 16px",
+            borderRadius: "50px",
+            boxShadow: "0 0 15px rgba(34, 197, 94, 0.05)"
+          }}>
+            <span className="online-pulse-dot" style={{
+              width: "8px",
+              height: "8px",
+              borderRadius: "50%",
+              backgroundColor: "#22c55e",
+              display: "inline-block",
+              boxShadow: "0 0 8px #22c55e"
+            }} />
+            <span style={{ fontSize: "11px", fontWeight: "900", color: "#22c55e", letterSpacing: "1px" }}>
+              {((onlineCount || 1) * 7 + 138).toLocaleString()} PLAYERS ONLINE
+            </span>
+          </div>
+        </div>
+
+        {/* ─── HERO STATUS AREA ─── */}
+        <div style={{
+          background: "linear-gradient(135deg, rgba(20, 20, 25, 0.7) 0%, rgba(10, 10, 12, 0.9) 100%)",
+          border: "1px solid rgba(255, 255, 255, 0.05)",
+          borderRadius: "24px",
+          padding: "24px",
+          marginBottom: "30px",
+          boxShadow: "0 15px 35px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.05)",
+          backdropFilter: "blur(12px)",
+          position: "relative",
+          overflow: "hidden"
+        }}>
+          <div style={{
+            position: "absolute",
+            top: "-50px",
+            right: "-50px",
+            width: "150px",
+            height: "150px",
+            borderRadius: "50%",
+            background: currentUserId ? currentRank.color + "12" : "#ef444408",
+            filter: "blur(50px)",
+            zIndex: 0,
+            pointerEvents: "none"
+          }} />
+
+          {currentUserId ? (
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "24px", position: "relative", zIndex: 1 }}>
+              {/* Profile Details & Emblem */}
+              <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+                {/* Custom Emblem */}
+                <div style={{
+                  width: "68px",
+                  height: "68px",
+                  borderRadius: "16px",
+                  background: currentRank.bg,
+                  border: `2px solid ${currentRank.border}`,
+                  boxShadow: currentRank.glow ? `${currentRank.glow}, inset 0 0 10px rgba(255,255,255,0.2)` : "inset 0 0 10px rgba(255,255,255,0.1)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: "950",
+                  color: currentRank.color,
+                  fontSize: "26px",
+                  fontStyle: "italic",
+                  textShadow: "0 2px 4px rgba(0,0,0,0.8)",
+                  position: "relative",
+                  overflow: "hidden"
+                }}>
+                  {currentRank.name.charAt(0)}
+                  {/* Glowing Overlay */}
+                  <div style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%)",
+                    transform: "translateX(-100%)",
+                    animation: "shimmer 2.5s infinite"
+                  }} />
+                  <style jsx>{`
+                    @keyframes shimmer {
+                      100% { transform: translateX(100%); }
+                    }
+                  `}</style>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: "10px", fontWeight: "900", color: "#ef4444", letterSpacing: "2.5px" }}>YOUR CURRENT STATUS</div>
+                  <div style={{ fontSize: "24px", fontWeight: "950", color: "white", display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
+                    {currentUsername}
+                    {isSupporter && (
+                      <span title="Founding OG" style={{
+                        fontSize: "9px",
+                        fontWeight: "950",
+                        background: "linear-gradient(135deg, #a855f7, #c084fc)",
+                        color: "white",
+                        padding: "2px 7px",
+                        borderRadius: "5px",
+                        letterSpacing: "0.5px",
+                        boxShadow: "0 0 10px rgba(168, 85, 247, 0.6)",
+                        display: "inline-block",
+                        textShadow: "none"
+                      }}>OG</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: "13px", color: "#a1a1aa", marginTop: "3px", fontWeight: "600" }}>
+                    <span style={{ color: currentRank.color, textShadow: currentRank.glow, fontWeight: "900" }}>{currentRank.name}</span>
+                    <span style={{ color: "#3f3f46", margin: "0 8px" }}>•</span>
+                    <span style={{ color: "white", fontWeight: "bold" }}>{currentElo} ELO</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Streaks & Ranking */}
+              <div style={{ display: "flex", gap: "30px", flexWrap: "wrap" }}>
+                <div style={{ borderLeft: "2px solid #18181b", paddingLeft: "20px" }}>
+                  <div style={{ fontSize: "10px", color: "#52525b", fontWeight: "900", letterSpacing: "1px" }}>STREAKS</div>
+                  <div style={{ marginTop: "6px", display: "flex", flexDirection: "column", gap: "3px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <svg className={currentStreak >= 3 ? "flame-icon-active" : ""} width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M17.657 16.657L13.414 20.9M13.414 20.9L9.172 16.657M13.414 20.9V14M13 3C13 3 17 7 17 10C17 14.5 12 18 12 18C12 18 7 14.5 7 10C7 6.5 11 3 11 3C11 3 9 7 9 9C9 11.5 11 12 11 12C11 12 13 11.5 13 9C13 7 13 3 13 3Z" 
+                          stroke={currentStreak >= 3 ? "#f97316" : "#3f3f46"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" 
+                          fill={currentStreak >= 3 ? "#ef4444" : "none"} 
+                        />
+                      </svg>
+                      <span style={{ fontSize: "13px", fontWeight: "950", color: currentStreak >= 3 ? "#ef4444" : "#71717a" }}>
+                        {currentStreak} WIN STREAK
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "10px", color: "#52525b", fontWeight: "bold" }}>PEAK STREAK: {highestStreak}</div>
+                  </div>
+                </div>
+
+                <div style={{ borderLeft: "2px solid #18181b", paddingLeft: "20px" }}>
+                  <div style={{ fontSize: "10px", color: "#52525b", fontWeight: "900", letterSpacing: "1px" }}>WEEKLY RANKING</div>
+                  <div style={{ fontSize: "16px", fontWeight: "950", color: "#fbbf24", marginTop: "4px", textShadow: "0 0 12px rgba(251, 191, 36, 0.35)", letterSpacing: "0.5px" }}>
+                    {weeklyPercentile}
+                  </div>
+                  <div style={{ fontSize: "10px", color: "#52525b", fontWeight: "bold", marginTop: "2px" }}>THIS WEEK</div>
+                </div>
+              </div>
+
+              {/* Progress Tracker */}
+              <div style={{ width: "100%", marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.03)", paddingTop: "14px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "10px", color: "#71717a", fontWeight: "900", marginBottom: "8px", letterSpacing: "0.5px" }}>
+                  <span>PROGRESS TO {progress.nextRankName.toUpperCase()}</span>
+                  <span>{currentElo} / {progress.nextMinElo} ELO</span>
+                </div>
+                <div style={{ width: "100%", height: "8px", backgroundColor: "#141416", borderRadius: "4px", overflow: "hidden", border: "1px solid rgba(255,255,255,0.02)" }}>
+                  <div style={{
+                    width: `${progress.percent}%`,
+                    height: "100%",
+                    background: `linear-gradient(90deg, #ef4444, ${currentRank.color})`,
+                    boxShadow: `0 0 10px ${currentRank.color}30`,
+                    borderRadius: "4px",
+                    transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)"
+                  }} />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "20px" }}>
+              <div style={{ flex: "1 1 300px" }}>
+                <div style={{ fontSize: "10px", fontWeight: "900", color: "#ef4444", letterSpacing: "2.5px" }}>YOUR CURRENT STATUS</div>
+                <div style={{ fontSize: "20px", fontWeight: "950", color: "white", marginTop: "4px", letterSpacing: "0.5px" }}>GUEST PROFILE</div>
+                <div style={{ fontSize: "13px", color: "#a1a1aa", marginTop: "6px", lineHeight: "1.5" }}>
+                  Ranked calibration, match logs, and ELO leaderboards are disabled for guests. Sign up to claim your digital prestige.
+                </div>
+              </div>
+              <button onClick={handleGoogleLogin} style={{
+                backgroundColor: "#ef4444", color: "white", fontWeight: "955", padding: "14px 28px", borderRadius: "12px", border: "none", cursor: "pointer", fontSize: "13px", boxShadow: "0 0 20px rgba(239, 68, 68, 0.35)", transition: "all 0.15s", letterSpacing: "0.5px"
+              }}
+                onMouseOver={(e) => e.currentTarget.style.transform = "scale(1.03)"}
+                onMouseOut={(e) => e.currentTarget.style.transform = "scale(1)"}
+              >
+                CLAIM ELO RATING
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ─── ROW 1: Tabs ─── */}
@@ -264,20 +660,20 @@ export default function Lobby() {
           <div style={{ display: "flex", gap: "24px", borderBottom: "1px solid #18181b", paddingBottom: 0 }}>
             <button 
               onClick={() => setActiveTab("modes")}
-              style={{ background: "none", border: "none", color: activeTab === "modes" ? "white" : "#3f3f46", fontSize: "13px", fontWeight: "bold", cursor: "pointer", paddingBottom: "12px", borderBottom: activeTab === "modes" ? "2px solid #ef4444" : "2px solid transparent", transition: "color 0.15s" }}
+              style={{ background: "none", border: "none", color: activeTab === "modes" ? "white" : "#3f3f46", fontSize: "13px", fontWeight: "bold", cursor: "pointer", paddingBottom: "12px", borderBottom: activeTab === "modes" ? "2px solid #ef4444" : "2px solid transparent", transition: "color 0.15s", letterSpacing: "1px" }}
             >BATTLE MODES</button>
             <button 
               onClick={() => setActiveTab("ranks")}
-              style={{ background: "none", border: "none", color: activeTab === "ranks" ? "white" : "#3f3f46", fontSize: "13px", fontWeight: "bold", cursor: "pointer", paddingBottom: "12px", borderBottom: activeTab === "ranks" ? "2px solid #ef4444" : "2px solid transparent", transition: "color 0.15s" }}
+              style={{ background: "none", border: "none", color: activeTab === "ranks" ? "white" : "#3f3f46", fontSize: "13px", fontWeight: "bold", cursor: "pointer", paddingBottom: "12px", borderBottom: activeTab === "ranks" ? "2px solid #ef4444" : "2px solid transparent", transition: "color 0.15s", letterSpacing: "1px" }}
             >GLOBAL RANKS</button>
           </div>
         </div>
 
         {/* ─── ROW 2: Action Buttons ─── */}
         <div className="lobby-actions">
-          <button className="enter-arena-btn" onClick={() => router.push("/arena")} style={{ backgroundColor: "#ef4444", color: "white", fontWeight: "900", padding: "10px 24px", borderRadius: "50px", border: "none", cursor: "pointer", fontSize: "13px", whiteSpace: "nowrap" }}>ENTER ARENA</button>
+          <button className="enter-arena-btn" onClick={() => router.push("/arena")} style={{ backgroundColor: "#ef4444", color: "white", fontWeight: "900", padding: "10px 24px", borderRadius: "50px", border: "none", cursor: "pointer", fontSize: "13px", whiteSpace: "nowrap", letterSpacing: "0.5px" }}>ENTER ARENA</button>
           {currentUserId && (
-            <button onClick={() => router.push(`/profile/${currentUserId}`)} style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "#d4d4d8", fontWeight: "bold", padding: "10px 18px", borderRadius: "50px", border: "1px solid #27272a", cursor: "pointer", fontSize: "13px", transition: "background 0.15s", whiteSpace: "nowrap" }}
+            <button onClick={() => router.push(`/profile/${currentUserId}`)} style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "#d4d4d8", fontWeight: "bold", padding: "10px 18px", borderRadius: "50px", border: "1px solid #27272a", cursor: "pointer", fontSize: "13px", transition: "background 0.15s", whiteSpace: "nowrap", letterSpacing: "0.5px" }}
               onMouseOver={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"}
               onMouseOut={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"}
             >
@@ -287,8 +683,9 @@ export default function Lobby() {
           <button
             className="support-btn"
             onClick={() => setIsSupportModalOpen(true)}
+            style={{ letterSpacing: "0.5px" }}
           >
-            <Heart size={14} fill="white" /> SUPPORT US
+            <Heart size={14} fill="white" /> FOUNDER ACCESS
           </button>
         </div>
 
@@ -300,7 +697,7 @@ export default function Lobby() {
                 <ModeCard 
                   icon={<Trophy/>} 
                   title="RANKED MATCH" 
-                  desc="Compete for ELO. Climb the global leaderboard." 
+                  desc="Compete for ELO rating. Standard arena matchmaking rules apply. Win streaks grant multipliers." 
                   color="#fbbf24" 
                   active 
                   className="mode-card"
@@ -312,19 +709,44 @@ export default function Lobby() {
                       router.push("/arena?mode=ranked");
                     }
                   }}
+                  stats={
+                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "8px" }}>
+                      <span style={{ fontSize: "10px", fontWeight: "900", color: "#fbbf24", background: "rgba(251, 191, 36, 0.08)", border: "1px solid rgba(251, 191, 36, 0.15)", padding: "4px 10px", borderRadius: "6px", letterSpacing: "0.5px" }}>
+                        QUEUE: {rankedQueueCount} PLAYERS
+                      </span>
+                      <span style={{ fontSize: "10px", fontWeight: "900", color: "#38bdf8", background: "rgba(56, 189, 248, 0.08)", border: "1px solid rgba(56, 189, 248, 0.15)", padding: "4px 10px", borderRadius: "6px", letterSpacing: "0.5px" }}>
+                        AVG WAIT: 6s
+                      </span>
+                      <span style={{ fontSize: "10px", fontWeight: "900", color: "#22c55e", background: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.15)", padding: "4px 10px", borderRadius: "6px", letterSpacing: "0.5px" }}>
+                        +32 ELO POSSIBLE
+                      </span>
+                      {currentStreak >= 3 && (
+                        <span className="pulse-fast" style={{ fontSize: "10px", fontWeight: "955", color: "#ef4444", background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.3)", padding: "4px 10px", borderRadius: "6px", boxShadow: "0 0 10px rgba(239, 68, 68, 0.2)", letterSpacing: "0.5px" }}>
+                          🔥 STREAK BONUS ACTIVE
+                        </span>
+                      )}
+                    </div>
+                  }
                 />
+                
                 <ModeCard 
                   icon={<Swords/>} 
                   title="CASUAL 1V1" 
-                  desc="Temporarily vaulted to ensure instant queue times in Ranked." 
+                  desc="Temporarily vaulted to ensure instant queue times in Ranked. Will return in Season 1." 
                   color="#3f3f46" 
                   className="mode-card"
+                  stats={
+                    <span style={{ fontSize: "10px", fontWeight: "900", color: "#71717a", background: "rgba(255, 255, 255, 0.02)", border: "1px solid rgba(255, 255, 255, 0.04)", padding: "4px 10px", borderRadius: "6px", letterSpacing: "0.5px" }}>
+                      VAULTED SEASON 0
+                    </span>
+                  }
                 />
+                
                 <ModeCard 
                   icon={<ShieldCheck/>} 
                   title="PRIVATE ROOM" 
                   className="mode-card"
-                  desc="Create or join a private battle room with a custom code." 
+                  desc="Challenge friends or hosts in custom secure spaces using direct battle codes." 
                   color="#22c55e" 
                   active
                   onClick={() => {
@@ -336,11 +758,21 @@ export default function Lobby() {
                       generateRoomCode();
                     }
                   }}
+                  stats={
+                    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "8px" }}>
+                      <span style={{ fontSize: "10px", fontWeight: "900", color: "#22c55e", background: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.15)", padding: "4px 10px", borderRadius: "6px", letterSpacing: "0.5px" }}>
+                        12 ACTIVE ROOMS
+                      </span>
+                      <span style={{ fontSize: "10px", fontWeight: "900", color: "#71717a", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.05)", padding: "4px 10px", borderRadius: "6px", letterSpacing: "0.5px" }}>
+                        NO ELO RATING IMPACT
+                      </span>
+                    </div>
+                  }
                 />
               </div>
             ) : (
-              <div style={{ backgroundColor: "rgba(24, 24, 27, 0.5)", borderRadius: "16px", padding: "30px", border: "1px solid #18181b", backdropFilter: "blur(10px)" }}>
-                <h2 style={{ fontSize: "11px", color: "#71717a", letterSpacing: "4px", marginBottom: "30px", textTransform: "uppercase" }}>Global Hall of Fame</h2>
+              <div style={{ backgroundColor: "rgba(24, 24, 27, 0.3)", borderRadius: "24px", padding: "30px", border: "1px solid #18181b", backdropFilter: "blur(10px)" }}>
+                <h2 style={{ fontSize: "11px", color: "#71717a", letterSpacing: "4px", marginBottom: "30px", textTransform: "uppercase", fontWeight: "900" }}>Global Hall of Fame</h2>
                 {leaderboard.map((user, i) => {
                    const rank = getPrestigeRankInfo(user.elo || 1200);
                    return (
@@ -364,9 +796,64 @@ export default function Lobby() {
           </main>
 
           <aside style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            
+            {/* Live Arena Activity Ticker */}
+            <div style={{
+              backgroundColor: "#0b0b0d",
+              border: "1px solid rgba(255,255,255,0.03)",
+              borderRadius: "20px",
+              padding: "24px",
+              position: "relative",
+              overflow: "hidden",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.3)"
+            }}>
+              {/* Pulsing indicator */}
+              <div style={{ position: "absolute", top: "24px", right: "24px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span className="online-pulse-dot" style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#ef4444", display: "inline-block", boxShadow: "0 0 6px #ef4444" }} />
+                <span style={{ fontSize: "9px", fontWeight: "955", color: "#ef4444", letterSpacing: "1px" }}>LIVE</span>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", color: "#ef4444" }}>
+                <Swords size={16} />
+                <h3 style={{ fontSize: "11px", fontWeight: "955", letterSpacing: "2.5px", margin: 0 }}>ARENA ACTIVITY</h3>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", minHeight: "150px" }}>
+                {liveActivities.map((act) => (
+                  <div key={act.id} style={{
+                    padding: "10px 12px",
+                    backgroundColor: "rgba(255,255,255,0.01)",
+                    border: "1px solid rgba(255,255,255,0.03)",
+                    borderRadius: "10px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: "11px",
+                    animation: "slideIn 0.3s ease-out",
+                    lineHeight: "1.4"
+                  }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                      <span style={{ color: "#d4d4d8", fontWeight: "600" }}>{act.text}</span>
+                      <span style={{ fontSize: "9px", color: "#52525b" }}>{act.timestamp}</span>
+                    </div>
+                    {act.type === "win" && (
+                      <span style={{ color: "#22c55e", fontWeight: "950", fontSize: "9px", background: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.15)", padding: "2px 6px", borderRadius: "4px" }}>
+                        +ELO
+                      </span>
+                    )}
+                    {act.type === "rankup" && (
+                      <span style={{ color: "#fbbf24", fontWeight: "950", fontSize: "9px", background: "rgba(251, 191, 36, 0.08)", border: "1px solid rgba(251, 191, 36, 0.15)", padding: "2px 6px", borderRadius: "4px" }}>
+                        UP
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {/* Recent Battles */}
             {recentMatches.length > 0 && (
-              <div style={{ backgroundColor: "#0f0f12", border: "1px solid #18181b", borderRadius: "16px", padding: "24px" }}>
+              <div style={{ backgroundColor: "#0b0b0d", border: "1px solid rgba(255,255,255,0.03)", borderRadius: "20px", padding: "24px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px", color: "#ef4444" }}>
                   <Swords size={16} />
                   <h3 style={{ fontSize: "11px", fontWeight: "900", letterSpacing: "2px", margin: 0 }}>RECENT BATTLES</h3>
@@ -375,9 +862,9 @@ export default function Lobby() {
                   {recentMatches.map((match) => {
                     const isWinner = match.winner_id === currentUserId;
                     return (
-                      <div key={match.id} style={{ padding: "10px", backgroundColor: "rgba(255,255,255,0.02)", borderRadius: "8px", borderLeft: `3px solid ${isWinner ? "#39FF14" : "#ef4444"}` }}>
+                      <div key={match.id} style={{ padding: "10px", backgroundColor: "rgba(255,255,255,0.01)", borderRadius: "8px", borderLeft: `3px solid ${isWinner ? "#22c55e" : "#ef4444"}`, border: "1px solid rgba(255,255,255,0.02)" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ fontSize: "11px", fontWeight: "bold", color: isWinner ? "#39FF14" : "#ef4444" }}>
+                          <span style={{ fontSize: "11px", fontWeight: "bold", color: isWinner ? "#22c55e" : "#ef4444" }}>
                             {isWinner ? "VICTORY" : "DEFEAT"}
                           </span>
                           <span style={{ fontSize: "9px", color: "#52525b", textTransform: "uppercase" }}>
@@ -386,7 +873,7 @@ export default function Lobby() {
                         </div>
                         <div style={{ fontSize: "10px", color: "#71717a", marginTop: "4px" }}>
                           {match.winner_score?.toFixed(1)} - {match.loser_score?.toFixed(1)}
-                          {match.elo_change > 0 && <span style={{ color: isWinner ? "#39FF14" : "#ef4444", marginLeft: "8px" }}>{isWinner ? "+" : "-"}{match.elo_change}</span>}
+                          {match.elo_change > 0 && <span style={{ color: isWinner ? "#22c55e" : "#ef4444", marginLeft: "8px" }}>{isWinner ? "+" : "-"}{match.elo_change}</span>}
                         </div>
                       </div>
                     );
@@ -395,37 +882,136 @@ export default function Lobby() {
               </div>
             )}
 
-            {/* Prestige Hierarchy Sidebar */}
-            <div style={{ backgroundColor: "#0f0f12", border: "1px solid #18181b", borderRadius: "16px", padding: "24px" }}>
+            {/* Prestige Hierarchy Sidebar with Interactive Tooltips */}
+            <div style={{ backgroundColor: "#0b0b0d", border: "1px solid rgba(255,255,255,0.03)", borderRadius: "20px", padding: "24px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px", color: "#fbbf24" }}>
                 <Star size={16} fill="#fbbf24" />
-                <h3 style={{ fontSize: "11px", fontWeight: "900", letterSpacing: "2px", margin: 0 }}>PRESTIGE HIERARCHY</h3>
+                <h3 style={{ fontSize: "11px", fontWeight: "955", letterSpacing: "2.5px", margin: 0 }}>PRESTIGE RANKS</h3>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {RANK_GROUPS.map((r) => (
-                  <div key={r.name} style={{ padding: "12px", backgroundColor: "rgba(255,255,255,0.02)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.03)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div style={{ fontSize: "12px", fontWeight: "900", color: r.color, textShadow: r.glow }}>{r.name}</div>
-                      <div style={{ fontSize: "9px", color: "#3f3f46", fontWeight: "bold" }}>{r.minElo}+ ELO</div>
+                {RANK_GROUPS.map((r) => {
+                  const isUnlocked = currentUserId ? currentElo >= r.minElo : false;
+                  return (
+                    <div key={r.name} className="rank-hierarchy-row" style={{
+                      padding: "12px",
+                      backgroundColor: "rgba(255,255,255,0.01)",
+                      borderRadius: "10px",
+                      border: `1px solid ${isUnlocked ? r.color + "25" : "rgba(255, 255, 255, 0.02)"}`,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      cursor: "help",
+                      transition: "all 0.2s"
+                    }}>
+                      
+                      {/* Interactive hover reward detail card */}
+                      <div className="rank-tooltip" style={{
+                        position: "absolute",
+                        left: "-255px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        width: "240px",
+                        backgroundColor: "#0d0d11",
+                        border: `1px solid ${r.color}40`,
+                        borderRadius: "12px",
+                        padding: "12px 16px",
+                        boxShadow: `0 10px 30px rgba(0,0,0,0.8), 0 0 15px ${r.color}15`,
+                        zIndex: 100,
+                        opacity: 0,
+                        pointerEvents: "none",
+                        transition: "all 0.2s ease",
+                        lineHeight: "1.4"
+                      }}>
+                        <div style={{ fontSize: "10px", fontWeight: "900", color: r.color, textShadow: r.glow, letterSpacing: "1px", textTransform: "uppercase" }}>{r.name} UNLOCKS</div>
+                        <div style={{ fontSize: "11px", color: "#d4d4d8", marginTop: "6px" }}><strong>Aura Power:</strong> {RANK_DETAILS[r.name]?.aura}</div>
+                        <div style={{ fontSize: "11px", color: "#d4d4d8", marginTop: "2px" }}><strong>Cosmetic:</strong> {RANK_DETAILS[r.name]?.reward}</div>
+                      </div>
+
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span style={{ fontSize: "12px", color: isUnlocked ? "#22c55e" : "#52525b" }}>{isUnlocked ? "✓" : "🔒"}</span>
+                        <div>
+                          <div style={{ fontSize: "12px", fontWeight: "955", color: r.color, textShadow: r.glow }}>
+                            {r.name}
+                          </div>
+                          <div style={{ fontSize: "9px", color: "#71717a", fontWeight: "900", marginTop: "1px" }}>
+                            {RANK_DETAILS[r.name]?.pct}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: "9px", color: isUnlocked ? "white" : "#52525b", fontWeight: "bold" }}>{r.minElo}+ ELO</div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
-            {/* Global Chat with Prestige Colors */}
-            <div style={{ backgroundColor: "#0f0f12", border: "1px solid #18181b", borderRadius: "16px", padding: "24px", maxHeight: "400px", display: "flex", flexDirection: "column" }}>
+            {/* Global Chat with Prestige Styling */}
+            <div style={{ backgroundColor: "#0b0b0d", border: "1px solid rgba(255,255,255,0.03)", borderRadius: "20px", padding: "24px", maxHeight: "400px", display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px", color: "#a855f7" }}>
                 <MessageCircle size={16} />
-                <h3 style={{ fontSize: "11px", fontWeight: "900", letterSpacing: "2px", margin: 0 }}>GLOBAL CHAT</h3>
+                <h3 style={{ fontSize: "11px", fontWeight: "955", letterSpacing: "2.5px", margin: 0 }}>ARENA CHAT</h3>
               </div>
-              <div style={{ flex: 1, overflowY: "auto", marginBottom: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={{ flex: 1, overflowY: "auto", marginBottom: "12px", display: "flex", flexDirection: "column", gap: "10px", paddingRight: "4px" }}>
                 {chatMessages.map((msg) => {
+                  const isSystem = msg.username === "SYSTEM" || msg.tier === "SYSTEM";
                   const rank = getRankStyle(msg.tier);
+                  const msgUserSupporter = supporterUserIds.has(msg.user_id) || (msg.user_id === currentUserId && isSupporter);
+                  
+                  if (isSystem) {
+                    return (
+                      <div key={msg.id} style={{
+                        fontSize: "11px",
+                        lineHeight: "1.4",
+                        backgroundColor: "rgba(239, 68, 68, 0.04)",
+                        border: "1px solid rgba(239, 68, 68, 0.15)",
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        color: "#fca5a5",
+                        fontWeight: "bold",
+                        boxShadow: "0 0 10px rgba(239, 68, 68, 0.05)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px"
+                      }}>
+                        <span style={{
+                          backgroundColor: "#ef4444",
+                          color: "white",
+                          fontSize: "8px",
+                          fontWeight: "955",
+                          padding: "1px 5px",
+                          borderRadius: "4px",
+                          letterSpacing: "0.5px"
+                        }}>SYSTEM</span>
+                        <span>{msg.message}</span>
+                      </div>
+                    );
+                  }
+                  
                   return (
-                    <div key={msg.id} style={{ fontSize: "11px", lineHeight: "1.4" }}>
-                      <span style={{ color: rank.color, textShadow: rank.glow, fontWeight: "900" }}>{msg.username}:</span>
-                      <span style={{ color: "#e4e4e7", marginLeft: "6px" }}>{msg.message}</span>
+                    <div key={msg.id} style={{ fontSize: "11px", lineHeight: "1.4", display: "flex", alignItems: "flex-start", gap: "6px" }}>
+                      <span style={{
+                        fontWeight: "955",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        textShadow: msgUserSupporter ? "0 0 8px #c084fc" : rank.glow,
+                        color: msgUserSupporter ? "#c084fc" : rank.color
+                      }}>
+                        {msgUserSupporter && (
+                          <span title="Founding OG Supporter" style={{
+                            fontSize: "8px",
+                            fontWeight: "955",
+                            background: "linear-gradient(135deg, #a855f7, #c084fc)",
+                            color: "white",
+                            padding: "1px 4px",
+                            borderRadius: "3px",
+                            lineHeight: 1,
+                            boxShadow: "0 0 6px rgba(168, 85, 247, 0.4)"
+                          }}>OG</span>
+                        )}
+                        {msg.username}:
+                      </span>
+                      <span style={{ color: "#d4d4d8", wordBreak: "break-word" }}>{msg.message}</span>
                     </div>
                   );
                 })}
@@ -438,7 +1024,7 @@ export default function Lobby() {
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={handleChatKeyDown}
                   placeholder="Say something..."
-                  style={{ flex: 1, backgroundColor: "#18181b", border: "1px solid #27272a", borderRadius: "8px", padding: "10px 12px", color: "white", fontSize: "11px", outline: "none" }}
+                  style={{ flex: 1, backgroundColor: "#141416", border: "1px solid #27272a", borderRadius: "8px", padding: "10px 12px", color: "white", fontSize: "11px", outline: "none" }}
                 />
                 <button onClick={sendChatMessage} style={{ backgroundColor: "#a855f7", border: "none", borderRadius: "8px", padding: "0 12px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <Send size={14} color="white" />
@@ -657,21 +1243,59 @@ export default function Lobby() {
   );
 }
 
-function ModeCard({ icon, title, desc, color, active = false, onClick, className }: any) {
+function ModeCard({ icon, title, desc, color, active = false, onClick, className, stats }: any) {
   return (
     <button 
       onClick={onClick}
       className={className}
-      style={{ display: "flex", alignItems: "center", gap: "25px", padding: "30px", backgroundColor: active ? "rgba(255,255,255,0.02)" : "transparent", border: `1px solid ${active ? color + "40" : "#18181b"}`, borderRadius: "12px", textAlign: "left", width: "100%", cursor: active ? "pointer" : "default", transition: "all 0.2s" }}
-      onMouseOver={(e) => active && (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)")}
-      onMouseOut={(e) => active && (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)")}
+      disabled={!active}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "25px",
+        padding: "30px",
+        backgroundColor: active ? "rgba(255,255,255,0.015)" : "rgba(255,255,255,0.002)",
+        border: `1px solid ${active ? color + "40" : "#18181b"}`,
+        borderRadius: "16px",
+        textAlign: "left",
+        width: "100%",
+        cursor: active ? "pointer" : "not-allowed",
+        transition: "all 0.25s ease",
+        boxShadow: active ? `0 4px 20px ${color}05` : "none",
+        opacity: active ? 1 : 0.45
+      }}
+      onMouseOver={(e) => {
+        if (active) {
+          e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.04)";
+          e.currentTarget.style.borderColor = color;
+          e.currentTarget.style.transform = "translateY(-2px)";
+          e.currentTarget.style.boxShadow = `0 8px 30px ${color}15`;
+        }
+      }}
+      onMouseOut={(e) => {
+        if (active) {
+          e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.015)";
+          e.currentTarget.style.borderColor = `${color}40`;
+          e.currentTarget.style.transform = "none";
+          e.currentTarget.style.boxShadow = `0 4px 20px ${color}05`;
+        }
+      }}
     >
-      <div className="mode-card-icon" style={{ color: color, padding: "15px", backgroundColor: `${color}10`, borderRadius: "10px", border: `1px solid ${color}20` }}>{icon}</div>
+      <div className="mode-card-icon" style={{
+        color: color,
+        padding: "16px",
+        backgroundColor: `${color}10`,
+        borderRadius: "12px",
+        border: `1px solid ${color}20`,
+        boxShadow: active ? `inset 0 0 10px ${color}15` : "none",
+        transition: "all 0.2s"
+      }}>{icon}</div>
       <div style={{ flex: 1 }}>
-        <div className="mode-card-title" style={{ fontWeight: "900", fontSize: "18px", color: active ? "white" : "#3f3f46", letterSpacing: "-0.5px" }}>{title}</div>
-        <div style={{ fontSize: "14px", color: "#71717a", marginTop: "4px" }}>{desc}</div>
+        <div className="mode-card-title" style={{ fontWeight: "950", fontSize: "18px", color: active ? "white" : "#52525b", letterSpacing: "0.5px" }}>{title}</div>
+        <div style={{ fontSize: "13px", color: active ? "#a1a1aa" : "#3f3f46", marginTop: "4px", lineHeight: "1.4" }}>{desc}</div>
+        {stats && <div style={{ marginTop: "12px" }}>{stats}</div>}
       </div>
-      <div style={{ color: active ? color : "#18181b", fontSize: "24px" }}>→</div>
+      <div style={{ color: active ? color : "#27272a", fontSize: "20px", fontWeight: "900", transition: "transform 0.2s" }}>→</div>
     </button>
   );
 }
