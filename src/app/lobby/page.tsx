@@ -378,6 +378,9 @@ export default function Lobby() {
         }
       `}</style>
       <style jsx>{`
+        @keyframes shimmer {
+          100% { transform: translateX(100%); }
+        }
         .lobby-container {
           max-width: 1000px;
           margin: 0 auto;
@@ -553,11 +556,6 @@ export default function Lobby() {
                     transform: "translateX(-100%)",
                     animation: "shimmer 2.5s infinite"
                   }} />
-                  <style jsx>{`
-                    @keyframes shimmer {
-                      100% { transform: translateX(100%); }
-                    }
-                  `}</style>
                 </div>
 
                 <div>
