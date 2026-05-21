@@ -20,7 +20,8 @@ export default async function AdminDashboard() {
 
   // ─── TELEMETRY DATA FETCHING ───
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  // Use the Service Role Key in the secure server environment to bypass RLS and fetch all events
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(supabaseUrl, supabaseKey);
 
   // Fetch last 90 days of analytics events
