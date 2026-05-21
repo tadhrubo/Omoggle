@@ -6,7 +6,6 @@ import { Swords, Trophy, BarChart3, ShieldCheck, Star, MessageCircle, Send, X, C
 import RankedVaultPoll from "@/components/RankedVaultPoll";
 
 import { RANK_GROUPS, getPrestigeRankInfo } from "@/utils/eloMath";
-import { usePresence } from "@/hooks/usePresence";
 
 const getRankStyle = (tierName: string) => {
   return RANK_GROUPS.find(r => r.name === tierName) || RANK_GROUPS[RANK_GROUPS.length - 1];
@@ -24,9 +23,6 @@ export default function Lobby() {
   const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
-
-  // ── Real-time presence counter ────────────────────────────────────────────
-  const { onlineCount } = usePresence();
 
   // Private Room State
   const [isPrivateModalOpen, setIsPrivateModalOpen] = useState(false);
@@ -212,13 +208,6 @@ export default function Lobby() {
                 style={{ background: "none", border: "none", color: activeTab === "ranks" ? "white" : "#3f3f46", fontSize: "14px", fontWeight: "bold", cursor: "pointer", paddingBottom: "15px", borderBottom: activeTab === "ranks" ? "2px solid #ef4444" : "none" }}
               >GLOBAL RANKS</button>
             </div>
-          </div>
-          {/* Live online count badge */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "15px", padding: "6px 14px", backgroundColor: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: "99px" }}>
-            <span style={{ width: "7px", height: "7px", borderRadius: "50%", backgroundColor: "#22c55e", boxShadow: "0 0 6px #22c55e", display: "inline-block", animation: "pulse 2s cubic-bezier(0.4,0,0.6,1) infinite" }} />
-            <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#22c55e", fontWeight: "bold", letterSpacing: "1px" }}>
-              {onlineCount} ONLINE NOW
-            </span>
           </div>
           <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
             {currentUserId && (
