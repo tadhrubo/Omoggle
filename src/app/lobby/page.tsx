@@ -2,8 +2,8 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Swords, Trophy, BarChart3, ShieldCheck, Star, MessageCircle, Send, X, Copy, Check } from "lucide-react";
-import RankedVaultPoll from "@/components/RankedVaultPoll";
+import { Swords, Trophy, BarChart3, ShieldCheck, Star, MessageCircle, Send, X, Copy, Check, Heart } from "lucide-react";
+import SupportDeveloperModal from "@/components/SupportDeveloperModal";
 
 import { RANK_GROUPS, getPrestigeRankInfo } from "@/utils/eloMath";
 
@@ -27,7 +27,7 @@ export default function Lobby() {
   // Private Room State
   const [isPrivateModalOpen, setIsPrivateModalOpen] = useState(false);
   const [privateTab, setPrivateTab] = useState<"create" | "join">("create");
-  const [isVaultedModalOpen, setIsVaultedModalOpen] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState("");
   const [codeCopied, setCodeCopied] = useState(false);
@@ -218,6 +218,14 @@ export default function Lobby() {
                 MY PROFILE
               </button>
             )}
+            <button
+              onClick={() => setIsSupportModalOpen(true)}
+              style={{ backgroundColor: "rgba(168, 85, 247, 0.1)", color: "#a855f7", fontWeight: "bold", padding: "12px 20px", borderRadius: "8px", border: "1px solid rgba(168, 85, 247, 0.3)", cursor: "pointer", fontSize: "14px", transition: "background 0.2s", display: "flex", alignItems: "center", gap: "6px" }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = "rgba(168, 85, 247, 0.2)"}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = "rgba(168, 85, 247, 0.1)"}
+            >
+              <Heart size={14} fill="#a855f7" /> SUPPORT
+            </button>
             <button className="enter-arena-btn" onClick={() => router.push("/arena")} style={{ backgroundColor: "#ef4444", color: "white", fontWeight: "900", padding: "12px 30px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "14px" }}>ENTER ARENA</button>
           </div>
         </header>
@@ -228,22 +236,27 @@ export default function Lobby() {
             {activeTab === "modes" ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
                 <ModeCard 
-                  icon={<Swords/>} 
-                  title="CASUAL 1V1" 
-                  desc="Random opponent. No ELO risk." 
-                  color="#ef4444" 
-                  active 
-                  className="mode-card"
-                  onClick={() => router.push("/arena?mode=casual")}
-                />
-                <ModeCard 
                   icon={<Trophy/>} 
                   title="RANKED MATCH" 
-                  desc="Temporarily vaulted. Click to cast your vote and secure your spot." 
+                  desc="Compete for ELO. Climb the global leaderboard." 
                   color="#fbbf24" 
                   active 
                   className="mode-card"
-                  onClick={() => setIsVaultedModalOpen(true)}
+                  onClick={() => {
+                    if (!currentUserId) {
+                      setAuthModalReason("ranked");
+                      setIsAuthRequiredModalOpen(true);
+                    } else {
+                      router.push("/arena?mode=ranked");
+                    }
+                  }}
+                />
+                <ModeCard 
+                  icon={<Swords/>} 
+                  title="CASUAL 1V1" 
+                  desc="Temporarily vaulted to ensure instant queue times in Ranked." 
+                  color="#3f3f46" 
+                  className="mode-card"
                 />
                 <ModeCard 
                   icon={<ShieldCheck/>} 
@@ -576,20 +589,8 @@ export default function Lobby() {
         </div>
       )}
 
-      {/* ─── RANKED VAULTED POLL MODAL ─── */}
-      {isVaultedModalOpen && (
-        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 220, backdropFilter: "blur(8px)", padding: "20px" }}>
-          <div style={{ position: "relative", width: "100%", maxWidth: "600px" }}>
-            <button 
-              onClick={() => setIsVaultedModalOpen(false)} 
-              style={{ position: "absolute", top: "15px", right: "15px", background: "none", border: "none", color: "#71717a", cursor: "pointer", zIndex: 10 }}
-            >
-              <X size={24} />
-            </button>
-            <RankedVaultPoll />
-          </div>
-        </div>
-      )}
+      {/* ─── SUPPORT DEVELOPER MODAL ─── */}
+      <SupportDeveloperModal isOpen={isSupportModalOpen} onClose={() => setIsSupportModalOpen(false)} />
     </div>
   );
 }
