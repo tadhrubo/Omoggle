@@ -15,7 +15,13 @@ import { createClient } from "@/lib/supabase/client";
  * immediately when a user leaves.
  */
 export function usePresence() {
-  const [onlineCount, setOnlineCount] = useState<number>(0);
+  const [onlineCount, setOnlineCount] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("omoggle_last_online_count");
+      if (saved) return parseInt(saved, 10);
+    }
+    return 0;
+  });
   const supabase = createClient();
 
   useEffect(() => {
@@ -42,8 +48,6 @@ export function usePresence() {
 
       const userId = getUserId();
 
-      setOnlineCount(0);
-
       channel = supabase.channel("global_lobby", {
         config: {
           presence: { key: userId, enabled: true },
@@ -62,6 +66,10 @@ export function usePresence() {
           console.log(
             `[Presence sync] keys=${uniqueKeys}, totalTabs=${totalTabs}`
           );
+          // Save to sessionStorage so it doesn't flicker to 0 on refresh
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("omoggle_last_online_count", uniqueKeys.toString());
+          }
           // Set online count to unique users instead of total tabs
           setOnlineCount(uniqueKeys);
         })
