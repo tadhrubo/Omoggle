@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 export default function LogoHomeButton() {
   const pathname = usePathname();
 
-  if (pathname === "/lobby") {
+  if (pathname === "/lobby" || pathname === "/") {
     return null;
   }
 

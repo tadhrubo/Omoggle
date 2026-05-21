@@ -236,52 +236,83 @@ export default function Home() {
   const tierInfo = getTier(displayElo);
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#09090b", color: "white", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif", position: "relative", overflow: "hidden" }}>
+    <div style={{ minHeight: "100vh", backgroundColor: "#09090b", color: "white", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", fontFamily: "'Inter', sans-serif", position: "relative", overflow: "hidden" }}>
       <AgeGate />
       
-      {/* --- DYNAMIC PROFILE PILL (Top Right) --- */}
-      <div style={{ position: "absolute", top: "24px", right: "24px", zIndex: 40 }}>
-        {loadingAuth ? (
-          <div style={{ width: "24px", height: "24px", border: "2px solid #27272a", borderTopColor: "#ef4444", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
-        ) : session ? (
-          <div style={{ padding: "8px 16px", backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid #27272a", borderRadius: "99px", display: "flex", alignItems: "center", gap: "12px", backdropFilter: "blur(10px)", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }}>
-            <div 
-              onClick={() => router.push(`/profile/${session.user.id}`)}
-              style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", transition: "opacity 0.2s" }}
-              onMouseOver={(e) => e.currentTarget.style.opacity = "0.7"}
-              onMouseOut={(e) => e.currentTarget.style.opacity = "1"}
-            >
-              {displayAvatar && <Image src={displayAvatar} alt="Avatar" width={32} height={32} style={{ borderRadius: "50%", border: "1px solid rgba(255,255,255,0.1)", objectFit: "cover" }} />}
-              <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
-                <span style={{ fontSize: "14px", fontWeight: "900", color: "white", lineHeight: "1" }}>{displayName}</span>
-                <span style={{ fontSize: "10px", color: "#a1a1aa", fontFamily: "monospace", marginTop: "2px" }}>
-                  <span style={{ color: tierInfo.color, textShadow: tierInfo.glow, fontWeight: "bold" }}>{tierInfo.label}</span> • {displayElo} ELO
-                </span>
+      {/* ─── HEADER BAR ─── */}
+      <div style={{
+        width: "100%",
+        maxWidth: "1000px",
+        padding: "24px 24px 10px 24px",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        boxSizing: "border-box",
+        zIndex: 40,
+      }}>
+        {/* Left: Logo Button */}
+        <Link href="/" style={{ display: "inline-flex", transition: "transform 0.2s ease" }}
+          onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+          onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
+        >
+          <Image
+            src="/logo.png"
+            alt="Omoggle Logo"
+            width={48}
+            height={48}
+            priority
+            style={{
+              borderRadius: "12px",
+              boxShadow: "0 0 20px rgba(239, 68, 68, 0.3)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          />
+        </Link>
+
+        {/* Right: Dynamic Profile Pill */}
+        <div>
+          {loadingAuth ? (
+            <div style={{ width: "24px", height: "24px", border: "2px solid #27272a", borderTopColor: "#ef4444", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+          ) : session ? (
+            <div style={{ padding: "8px 16px", backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid #27272a", borderRadius: "99px", display: "flex", alignItems: "center", gap: "12px", backdropFilter: "blur(10px)", boxShadow: "0 10px 30px rgba(0,0,0,0.5)" }}>
+              <div 
+                onClick={() => router.push(`/profile/${session.user.id}`)}
+                style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", transition: "opacity 0.2s" }}
+                onMouseOver={(e) => e.currentTarget.style.opacity = "0.7"}
+                onMouseOut={(e) => e.currentTarget.style.opacity = "1"}
+              >
+                {displayAvatar && <Image src={displayAvatar} alt="Avatar" width={32} height={32} style={{ borderRadius: "50%", border: "1px solid rgba(255,255,255,0.1)", objectFit: "cover" }} />}
+                <div style={{ display: "flex", flexDirection: "column", textAlign: "left" }}>
+                  <span style={{ fontSize: "14px", fontWeight: "900", color: "white", lineHeight: "1" }}>{displayName}</span>
+                  <span style={{ fontSize: "10px", color: "#a1a1aa", fontFamily: "monospace", marginTop: "2px" }}>
+                    <span style={{ color: tierInfo.color, textShadow: tierInfo.glow, fontWeight: "bold" }}>{tierInfo.label}</span> • {displayElo} ELO
+                  </span>
+                </div>
               </div>
+              <div style={{ width: "1px", height: "24px", backgroundColor: "#27272a", margin: "0 4px" }}></div>
+              <button 
+                onClick={() => {
+                  setEditName(profile?.username || ""); // Resets input to actual name when opening modal
+                  setIsSettingsOpen(true);
+                }} 
+                style={{ background: "none", border: "none", color: "#71717a", cursor: "pointer", display: "flex", alignItems: "center", transition: "color 0.2s" }} 
+                onMouseOver={(e) => e.currentTarget.style.color = "white"} 
+                onMouseOut={(e) => e.currentTarget.style.color = "#71717a"}
+              >
+                <Settings size={16} />
+              </button>
+              <button onClick={handleLogout} style={{ background: "none", border: "none", color: "#71717a", cursor: "pointer", display: "flex", alignItems: "center", transition: "color 0.2s" }} onMouseOver={(e) => e.currentTarget.style.color = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.color = "#71717a"}><LogOut size={16} /></button>
             </div>
-            <div style={{ width: "1px", height: "24px", backgroundColor: "#27272a", margin: "0 4px" }}></div>
-            <button 
-              onClick={() => {
-                setEditName(profile?.username || ""); // Resets input to actual name when opening modal
-                setIsSettingsOpen(true);
-              }} 
-              style={{ background: "none", border: "none", color: "#71717a", cursor: "pointer", display: "flex", alignItems: "center", transition: "color 0.2s" }} 
-              onMouseOver={(e) => e.currentTarget.style.color = "white"} 
-              onMouseOut={(e) => e.currentTarget.style.color = "#71717a"}
-            >
-              <Settings size={16} />
-            </button>
-            <button onClick={handleLogout} style={{ background: "none", border: "none", color: "#71717a", cursor: "pointer", display: "flex", alignItems: "center", transition: "color 0.2s" }} onMouseOver={(e) => e.currentTarget.style.color = "#ef4444"} onMouseOut={(e) => e.currentTarget.style.color = "#71717a"}><LogOut size={16} /></button>
-          </div>
-        ) : (
-          <button onClick={() => setIsAuthModalOpen(true)} style={{ padding: "10px 24px", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "99px", color: "white", fontSize: "12px", fontWeight: "bold", cursor: "pointer", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.2s" }} onMouseOver={(e) => { e.currentTarget.style.backgroundColor = "white"; e.currentTarget.style.color = "black"; }} onMouseOut={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.03)"; e.currentTarget.style.color = "white"; }}><User size={16} /> SIGN IN</button>
-        )}
+          ) : (
+            <button onClick={() => setIsAuthModalOpen(true)} style={{ padding: "10px 24px", backgroundColor: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "99px", color: "white", fontSize: "12px", fontWeight: "bold", cursor: "pointer", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", gap: "8px", transition: "all 0.2s" }} onMouseOver={(e) => { e.currentTarget.style.backgroundColor = "white"; e.currentTarget.style.color = "black"; }} onMouseOut={(e) => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.03)"; e.currentTarget.style.color = "white"; }}><User size={16} /> SIGN IN</button>
+          )}
+        </div>
       </div>
 
       <style jsx global>{` @keyframes spin { 100% { transform: rotate(360deg); } } `}</style>
 
       {/* --- HERO CONTENT --- */}
-      <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "4px", marginBottom: "30px", display: "flex", alignItems: "center", gap: "10px" }}><span>♦</span> FACE THE COMPETITION <span>♦</span></div>
+      <div style={{ color: "#ef4444", fontSize: "10px", fontWeight: "bold", letterSpacing: "4px", marginTop: "50px", marginBottom: "30px", display: "flex", alignItems: "center", gap: "10px" }}><span>♦</span> FACE THE COMPETITION <span>♦</span></div>
 
       <h1 style={{ textAlign: "center", lineHeight: "1.1", marginBottom: "30px", margin: 0 }}>
         <span style={{ fontSize: "clamp(5rem, 15vw, 9rem)", fontWeight: "400", letterSpacing: "-2px", display: "block" }}>MOG</span>
