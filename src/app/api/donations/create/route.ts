@@ -28,6 +28,7 @@ export async function POST(request: Request) {
     const payload = {
       price_amount: parsedAmount,
       price_currency: "usd",
+      pay_currency: "ltc",
       order_id: user_id,
       order_description: "Omoggle Server Donation",
       success_url: "https://omoggle.games/lobby",

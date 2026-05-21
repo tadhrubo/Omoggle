@@ -294,8 +294,11 @@ export default function SupportDeveloperModal({ isOpen, onClose }: SupportDevelo
               )}
             </button>
 
-            <p style={{ color: "#3f3f46", fontSize: "10px", marginTop: "14px" }}>
+            <p style={{ color: "#3f3f46", fontSize: "10px", marginTop: "14px", lineHeight: "1.5" }}>
               Secure checkout via NOWPayments. You'll be redirected to complete payment.
+            </p>
+            <p style={{ color: "#71717a", fontSize: "11px", marginTop: "10px", lineHeight: "1.5", backgroundColor: "rgba(168, 85, 247, 0.05)", padding: "10px 12px", borderRadius: "8px", border: "1px solid rgba(168, 85, 247, 0.1)" }}>
+              💡 <strong>Tip:</strong> To avoid high network gas fees on small donations, we highly recommend using the default LTC (Litecoin) or selecting SOL / USDT (TRC20) at checkout.
             </p>
           </div>
         )}
