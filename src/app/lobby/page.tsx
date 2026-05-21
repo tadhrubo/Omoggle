@@ -150,7 +150,7 @@ export default function Lobby() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#050505", color: "white", padding: "40px 20px", fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ minHeight: "100vh", backgroundColor: "#050505", color: "white", padding: "30px 16px", fontFamily: "'Inter', sans-serif" }}>
       <style jsx>{`
         .lobby-container {
           max-width: 1000px;
@@ -161,25 +161,65 @@ export default function Lobby() {
           grid-template-columns: 1fr 340px;
           gap: 40px;
         }
+        .lobby-header-top {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12px;
+        }
+        .lobby-actions {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          margin-bottom: 30px;
+        }
+        .support-btn {
+          background: linear-gradient(135deg, #7c3aed, #a855f7, #c084fc);
+          background-size: 200% 200%;
+          animation: gradientShift 3s ease infinite;
+          color: white;
+          font-weight: 900;
+          padding: 10px 20px;
+          border-radius: 50px;
+          border: none;
+          cursor: pointer;
+          font-size: 13px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          box-shadow: 0 0 18px rgba(168, 85, 247, 0.35);
+          transition: transform 0.15s, box-shadow 0.15s;
+          white-space: nowrap;
+        }
+        .support-btn:hover {
+          transform: scale(1.04);
+          box-shadow: 0 0 28px rgba(168, 85, 247, 0.55);
+        }
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
         @media (max-width: 900px) {
           .lobby-grid {
             grid-template-columns: 1fr;
             gap: 30px;
           }
-          .lobby-header {
+          .lobby-header-top {
             flex-direction: column;
-            align-items: flex-start !important;
-            gap: 20px;
-          }
-          .enter-arena-btn {
-            width: 100%;
-            margin-bottom: 20px !important;
-          }
-          .lobby-tabs {
-            gap: 15px !important;
+            align-items: stretch;
+            gap: 12px;
           }
         }
         @media (max-width: 600px) {
+          .lobby-actions {
+            gap: 6px;
+          }
+          .lobby-actions button {
+            flex: 1 1 auto;
+            min-width: 0;
+            justify-content: center;
+          }
           .mode-card {
             padding: 20px !important;
             gap: 15px !important;
@@ -195,40 +235,38 @@ export default function Lobby() {
 
       <div className="lobby-container">
         
-        {/* Header & Tab Switcher */}
-        <header className="lobby-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "50px", borderBottom: "1px solid #18181b", paddingLeft: "70px" }}>
-          <div>
-            <div className="lobby-tabs" style={{ display: "flex", gap: "30px" }}>
-              <button 
-                onClick={() => setActiveTab("modes")}
-                style={{ background: "none", border: "none", color: activeTab === "modes" ? "white" : "#3f3f46", fontSize: "14px", fontWeight: "bold", cursor: "pointer", paddingBottom: "15px", borderBottom: activeTab === "modes" ? "2px solid #ef4444" : "none" }}
-              >BATTLE MODES</button>
-              <button 
-                onClick={() => setActiveTab("ranks")}
-                style={{ background: "none", border: "none", color: activeTab === "ranks" ? "white" : "#3f3f46", fontSize: "14px", fontWeight: "bold", cursor: "pointer", paddingBottom: "15px", borderBottom: activeTab === "ranks" ? "2px solid #ef4444" : "none" }}
-              >GLOBAL RANKS</button>
-            </div>
+        {/* ─── ROW 1: Tabs ─── */}
+        <div className="lobby-header-top">
+          <div style={{ display: "flex", gap: "24px", borderBottom: "1px solid #18181b", paddingBottom: 0 }}>
+            <button 
+              onClick={() => setActiveTab("modes")}
+              style={{ background: "none", border: "none", color: activeTab === "modes" ? "white" : "#3f3f46", fontSize: "13px", fontWeight: "bold", cursor: "pointer", paddingBottom: "12px", borderBottom: activeTab === "modes" ? "2px solid #ef4444" : "2px solid transparent", transition: "color 0.15s" }}
+            >BATTLE MODES</button>
+            <button 
+              onClick={() => setActiveTab("ranks")}
+              style={{ background: "none", border: "none", color: activeTab === "ranks" ? "white" : "#3f3f46", fontSize: "13px", fontWeight: "bold", cursor: "pointer", paddingBottom: "12px", borderBottom: activeTab === "ranks" ? "2px solid #ef4444" : "2px solid transparent", transition: "color 0.15s" }}
+            >GLOBAL RANKS</button>
           </div>
-          <div style={{ display: "flex", gap: "10px", marginBottom: "15px" }}>
-            {currentUserId && (
-              <button onClick={() => router.push(`/profile/${currentUserId}`)} style={{ backgroundColor: "rgba(255,255,255,0.05)", color: "white", fontWeight: "bold", padding: "12px 20px", borderRadius: "8px", border: "1px solid #27272a", cursor: "pointer", fontSize: "14px", transition: "background 0.2s" }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)"}
-              >
-                MY PROFILE
-              </button>
-            )}
-            <button
-              onClick={() => setIsSupportModalOpen(true)}
-              style={{ backgroundColor: "rgba(168, 85, 247, 0.1)", color: "#a855f7", fontWeight: "bold", padding: "12px 20px", borderRadius: "8px", border: "1px solid rgba(168, 85, 247, 0.3)", cursor: "pointer", fontSize: "14px", transition: "background 0.2s", display: "flex", alignItems: "center", gap: "6px" }}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = "rgba(168, 85, 247, 0.2)"}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = "rgba(168, 85, 247, 0.1)"}
+        </div>
+
+        {/* ─── ROW 2: Action Buttons ─── */}
+        <div className="lobby-actions">
+          <button className="enter-arena-btn" onClick={() => router.push("/arena")} style={{ backgroundColor: "#ef4444", color: "white", fontWeight: "900", padding: "10px 24px", borderRadius: "50px", border: "none", cursor: "pointer", fontSize: "13px", whiteSpace: "nowrap" }}>ENTER ARENA</button>
+          {currentUserId && (
+            <button onClick={() => router.push(`/profile/${currentUserId}`)} style={{ backgroundColor: "rgba(255,255,255,0.06)", color: "#d4d4d8", fontWeight: "bold", padding: "10px 18px", borderRadius: "50px", border: "1px solid #27272a", cursor: "pointer", fontSize: "13px", transition: "background 0.15s", whiteSpace: "nowrap" }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"}
             >
-              <Heart size={14} fill="#a855f7" /> SUPPORT
+              MY PROFILE
             </button>
-            <button className="enter-arena-btn" onClick={() => router.push("/arena")} style={{ backgroundColor: "#ef4444", color: "white", fontWeight: "900", padding: "12px 30px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "14px" }}>ENTER ARENA</button>
-          </div>
-        </header>
+          )}
+          <button
+            className="support-btn"
+            onClick={() => setIsSupportModalOpen(true)}
+          >
+            <Heart size={14} fill="white" /> SUPPORT US
+          </button>
+        </div>
 
         <div className="lobby-grid">
           
