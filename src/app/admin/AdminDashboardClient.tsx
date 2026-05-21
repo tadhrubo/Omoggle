@@ -106,6 +106,7 @@ export default function AdminDashboardClient({
     | "casual_battle_complete"
     | "casual_share_download"
     | "casual_share_social"
+    | "active_users"
   >("session_start");
   const [chartType, setChartType] = useState<"line" | "bar">("line");
   const [hoveredPoint, setHoveredPoint] = useState<{
@@ -291,6 +292,7 @@ export default function AdminDashboardClient({
 
   // --- METRIC THEME COLOR MAP ---
   const getMetricColor = (metricId: string) => {
+    if (metricId === "active_users") return "#22c55e"; // Emerald
     if (metricId.startsWith("casual_")) return "#3b82f6"; // Blue
     if (metricId === "session_start") return "#a1a1aa"; // Zinc
     if (metricId === "signups") return "#a855f7"; // Purple
@@ -298,6 +300,15 @@ export default function AdminDashboardClient({
   };
 
   const getMetricColors = (metricId: string) => {
+    if (metricId === "active_users") {
+      return {
+        accent: "#22c55e", // Emerald
+        accentDark: "#15803d",
+        accentDarker: "#052e16",
+        glowColor: "#22c55e",
+        bgGradient: "from-green-500 to-emerald-400"
+      };
+    }
     if (metricId.startsWith("casual_")) {
       return {
         accent: "#3b82f6", // Blue
@@ -338,14 +349,14 @@ export default function AdminDashboardClient({
 
   // --- TIME GROUPING & FILTERING LOGIC ---
   const chartData = useMemo(() => {
-    const result: { label: string; value: number; date: Date }[] = [];
+    const result: { label: string; value: number; date: Date; _users?: Set<string> }[] = [];
 
     if (timeRange === "24h") {
       for (let i = 23; i >= 0; i--) {
         const d = new Date(now.getTime() - i * 60 * 60 * 1000);
         d.setMinutes(0, 0, 0);
         const label = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-        result.push({ label, value: 0, date: d });
+        result.push({ label, value: 0, date: d, _users: new Set() });
       }
       if (activeMetric === "signups") {
         initialProfiles.forEach(p => {
@@ -371,6 +382,9 @@ export default function AdminDashboardClient({
               if (activeMetric === "all" || e.event_type === activeMetric) {
                 result[hourIndex].value++;
               }
+              if (activeMetric === "active_users") {
+                result[hourIndex]._users!.add(e.user_id);
+              }
             }
           }
         });
@@ -380,7 +394,7 @@ export default function AdminDashboardClient({
         const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
         d.setHours(0, 0, 0, 0);
         const label = d.toLocaleDateString([], { month: "short", day: "2-digit" });
-        result.push({ label, value: 0, date: d });
+        result.push({ label, value: 0, date: d, _users: new Set() });
       }
       if (activeMetric === "signups") {
         initialProfiles.forEach(p => {
@@ -406,6 +420,9 @@ export default function AdminDashboardClient({
               if (activeMetric === "all" || e.event_type === activeMetric) {
                 result[dayIndex].value++;
               }
+              if (activeMetric === "active_users") {
+                result[dayIndex]._users!.add(e.user_id);
+              }
             }
           }
         });
@@ -418,7 +435,7 @@ export default function AdminDashboardClient({
         const startOfWeek = new Date(d.setDate(diff));
         startOfWeek.setHours(0, 0, 0, 0);
         const label = "Wk of " + startOfWeek.toLocaleDateString([], { month: "short", day: "numeric" });
-        result.push({ label, value: 0, date: startOfWeek });
+        result.push({ label, value: 0, date: startOfWeek, _users: new Set() });
       }
       if (activeMetric === "signups") {
         initialProfiles.forEach(p => {
@@ -456,6 +473,9 @@ export default function AdminDashboardClient({
               if (activeMetric === "all" || e.event_type === activeMetric) {
                 result[matchedIndex].value++;
               }
+              if (activeMetric === "active_users") {
+                result[matchedIndex]._users!.add(e.user_id);
+              }
             }
           }
         });
@@ -464,7 +484,7 @@ export default function AdminDashboardClient({
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const label = d.toLocaleDateString([], { month: "short", year: "2-digit" });
-        result.push({ label, value: 0, date: d });
+        result.push({ label, value: 0, date: d, _users: new Set() });
       }
       if (activeMetric === "signups") {
         initialProfiles.forEach(p => {
@@ -487,9 +507,18 @@ export default function AdminDashboardClient({
             if (activeMetric === "all" || e.event_type === activeMetric) {
               result[monthIndex].value++;
             }
+            if (activeMetric === "active_users") {
+              result[monthIndex]._users!.add(e.user_id);
+            }
           }
         });
       }
+    }
+
+    if (activeMetric === "active_users") {
+      result.forEach(r => {
+        r.value = r._users ? r._users.size : 0;
+      });
     }
 
     return result;
@@ -770,6 +799,7 @@ export default function AdminDashboardClient({
                     { id: "casual_battle_complete", label: "Casual Completed", icon: <Award size={11} /> },
                     { id: "casual_share_download", label: "Casual Downloads", icon: <Share2 size={11} /> },
                     { id: "casual_share_social", label: "Casual Shares", icon: <Share2 size={11} /> },
+                    { id: "active_users", label: "Active Users", icon: <Activity size={11} /> },
                     { id: "signups", label: "Sign Ups", icon: <Users size={11} /> },
                     { id: "all", label: "All Events", icon: <Activity size={11} /> },
                   ].map(metric => (
