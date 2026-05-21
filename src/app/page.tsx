@@ -7,6 +7,7 @@ import AgeGate from "@/components/AgeGate";
 import Link from "next/link";
 import Image from "next/image";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { usePresence } from "@/hooks/usePresence";
 
 // ─── FAQ ACCORDION ─────────────────────────────────────────────────────────
 const FAQ_ITEMS = [
@@ -111,12 +112,7 @@ export default function Home() {
   const [editName, setEditName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // Database Stats State
-  const [dbStats, setDbStats] = useState({ inArena: 0, totalUsers: 0, avgWait: 0 });
-
-  const animatedArena = useAnimatedNumber(dbStats.inArena, 2000);
-  const animatedUsers = useAnimatedNumber(dbStats.totalUsers, 2500);
-  const animatedWait = useAnimatedNumber(dbStats.avgWait * 10, 1500) / 10;
+  const { onlineCount } = usePresence();
 
   useEffect(() => {
     let isMounted = true;
@@ -161,29 +157,9 @@ export default function Home() {
       }
     });
 
-    // Background Stats Polling
-    const fetchLiveStats = async () => {
-      try {
-        const { count: rankedCount } = await supabase.from('ranked_queue').select('*', { count: 'exact', head: true });
-        const { count: casualCount } = await supabase.from('arena_queue').select('*', { count: 'exact', head: true });
-        const { count: userCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true });
-
-        const totalInArena = (rankedCount || 0) + (casualCount || 0);
-        if (isMounted) {
-          setDbStats({ inArena: totalInArena, totalUsers: userCount || 0, avgWait: totalInArena > 0 ? 1.2 : 4.2 });
-        }
-      } catch (error) { 
-        console.error("Stats Fetch Error", error); 
-      }
-    };
-    
-    fetchLiveStats();
-    const interval = setInterval(fetchLiveStats, 10000);
-    
     // Cleanup
     return () => { 
       isMounted = false; 
-      clearInterval(interval); 
       subscription.unsubscribe(); 
     };
   }, [supabase]); // ARCHITECT FIX: Removed 'profile' from dependencies. This stops the infinite loop!
@@ -317,7 +293,7 @@ export default function Home() {
 
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "50px" }}>
         <div style={{ width: "10px", height: "10px", backgroundColor: "#22c55e", borderRadius: "50%", boxShadow: "0 0 10px #22c55e" }}></div>
-        <span style={{ color: "#22c55e", fontSize: "12px", fontWeight: "bold", letterSpacing: "1px" }}>{(animatedArena + 7458).toLocaleString()} IN ARENA</span>
+        <span style={{ color: "#22c55e", fontSize: "12px", fontWeight: "bold", letterSpacing: "1px" }}>{onlineCount.toLocaleString()} IN ARENA</span>
       </div>
 
       <div style={{ width: "100%", maxWidth: "400px", marginBottom: "80px", display: "flex", flexDirection: "column", gap: "15px" }}>
@@ -369,8 +345,7 @@ export default function Home() {
 
       <div style={{ display: "flex", justifyContent: "center", gap: "clamp(30px, 8vw, 80px)", textAlign: "center" }}>
         {/* <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedUsers >= 1000 ? (animatedUsers / 1000).toFixed(1) + 'K' : animatedUsers}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>MOGGERS REGISTERED</div></div> */}
-        <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedArena + 7458}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>ACTIVE NOW</div></div>
-        <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedWait.toFixed(1)}S</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>AVG WAIT</div></div>
+        <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{onlineCount}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>ACTIVE NOW</div></div>
       </div>
 
 
