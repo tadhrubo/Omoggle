@@ -383,7 +383,7 @@ export default function AdminDashboardClient({
                 result[hourIndex].value++;
               }
               if (activeMetric === "active_users") {
-                result[hourIndex]._users!.add(e.user_id);
+                if (e.user_id) result[hourIndex]._users!.add(e.user_id);
               }
             }
           }
@@ -421,7 +421,7 @@ export default function AdminDashboardClient({
                 result[dayIndex].value++;
               }
               if (activeMetric === "active_users") {
-                result[dayIndex]._users!.add(e.user_id);
+                if (e.user_id) result[dayIndex]._users!.add(e.user_id);
               }
             }
           }
@@ -474,7 +474,7 @@ export default function AdminDashboardClient({
                 result[matchedIndex].value++;
               }
               if (activeMetric === "active_users") {
-                result[matchedIndex]._users!.add(e.user_id);
+                if (e.user_id) result[matchedIndex]._users!.add(e.user_id);
               }
             }
           }
@@ -508,7 +508,7 @@ export default function AdminDashboardClient({
               result[monthIndex].value++;
             }
             if (activeMetric === "active_users") {
-              result[monthIndex]._users!.add(e.user_id);
+              if (e.user_id) result[monthIndex]._users!.add(e.user_id);
             }
           }
         });

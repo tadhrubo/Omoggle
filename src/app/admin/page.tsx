@@ -32,7 +32,9 @@ export default async function AdminDashboard() {
     supabase
       .from("analytics_events")
       .select("*")
-      .gte("created_at", ninetyDaysAgo.toISOString()),
+      .gte("created_at", ninetyDaysAgo.toISOString())
+      .order("created_at", { ascending: false })
+      .limit(50000),
     
     supabase
       .from("profiles")
