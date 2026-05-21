@@ -139,9 +139,9 @@ export default function AdminDashboardClient({
   // --- CORE ANALYTICAL COMPUTATIONS ---
   const kpis = useMemo(() => {
     const totalSessions = initialEvents.filter(e => e.event_type === "session_start").length;
-    const battlesJoined = initialEvents.filter(e => e.event_type === "battle_join").length;
-    const battlesCompleted = initialEvents.filter(e => e.event_type === "battle_complete").length;
-    const shareClicks = initialEvents.filter(e => e.event_type === "share_click").length;
+    const battlesJoined = initialEvents.filter(e => e.event_type === "battle_join" || e.event_type === "casual_battle_join").length;
+    const battlesCompleted = initialEvents.filter(e => e.event_type === "battle_complete" || e.event_type === "casual_battle_complete").length;
+    const shareClicks = initialEvents.filter(e => e.event_type === "share_click" || e.event_type === "casual_share_download" || e.event_type === "casual_share_social").length;
 
     const completionRate = battlesJoined > 0 ? Math.round((battlesCompleted / battlesJoined) * 100) : 0;
     const shareRate = battlesCompleted > 0 ? Math.round((shareClicks / battlesCompleted) * 100) : 0;

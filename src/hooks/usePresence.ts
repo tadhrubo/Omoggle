@@ -29,7 +29,18 @@ export function usePresence() {
         data: { session },
       } = await supabase.auth.getSession();
 
-      const userId = session?.user?.id ?? "anonymous";
+      const getUserId = () => {
+        if (session?.user?.id) return session.user.id;
+        if (typeof window === "undefined") return "server";
+        let uid = localStorage.getItem("omoggle_anon_id");
+        if (!uid) {
+          uid = "anon_" + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+          localStorage.setItem("omoggle_anon_id", uid);
+        }
+        return uid;
+      };
+
+      const userId = getUserId();
 
       setOnlineCount(0);
 
@@ -51,7 +62,8 @@ export function usePresence() {
           console.log(
             `[Presence sync] keys=${uniqueKeys}, totalTabs=${totalTabs}`
           );
-          setOnlineCount(totalTabs);
+          // Set online count to unique users instead of total tabs
+          setOnlineCount(uniqueKeys);
         })
         .on("presence", { event: "join" }, ({ newPresences }) => {
           // Handled by sync, but kept for clarity

@@ -268,7 +268,7 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
         winner_score: isWinner ? finalScore : (opponentScore || 0),
         loser_score: isWinner ? (opponentScore || 0) : finalScore,
         elo_change: mode === "ranked" ? Math.abs(eloChange) : 0,
-        mode: mode.toUpperCase() // 'RANKED' or 'CASUAL'
+        mode: mode.toLowerCase() // 'ranked' or 'casual'
       }]).then();
 
       if (mode === "ranked" && localProfile.id) {
