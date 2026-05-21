@@ -619,7 +619,9 @@ export default function AdminDashboardClient({
           <p className="text-zinc-500 text-[10px] tracking-wider uppercase mb-1.5">TOTAL BATTLES LOGGED</p>
           <p className="text-4xl font-black tracking-tighter text-emerald-500">{initialMatches.length}</p>
           <div className="flex items-center gap-2 mt-4 text-[10px] text-zinc-500 border-t border-zinc-900 pt-3 font-sans">
-            Success rate: <span className="text-emerald-400 font-mono font-bold">{kpis.completionRate}%</span>
+            <span className="text-emerald-400 font-mono font-bold">{initialMatches.filter(m => m.mode?.toUpperCase() === 'RANKED').length}</span> RANKED
+            <span className="text-zinc-800 font-bold">•</span>
+            <span className="text-blue-400 font-mono font-bold">{initialMatches.filter(m => m.mode?.toUpperCase() === 'CASUAL').length}</span> CASUAL
           </div>
         </div>
 
@@ -1243,8 +1245,10 @@ export default function AdminDashboardClient({
                       {/* Battle Mode */}
                       <td className="p-4 text-center">
                         <span className={`px-2 py-1 rounded text-[9px] font-bold border ${
-                          m.mode === "ranked"
+                          m.mode?.toUpperCase() === "RANKED"
                             ? "bg-red-950/40 text-red-400 border-red-900"
+                            : m.mode?.toUpperCase() === "CASUAL"
+                            ? "bg-blue-950/40 text-blue-400 border-blue-900"
                             : "bg-zinc-900/40 text-zinc-400 border-zinc-850"
                         } tracking-widest uppercase`}>
                           {m.mode}

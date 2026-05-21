@@ -232,6 +232,16 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
       const { newElo, eloChange } = calculateEloUpdate(localProfile.elo, oppElo, isWinner);
       setEloResult({ newElo, change: eloChange });
 
+      // Always log the match, whether it's ranked or casual
+      supabase.from('matches').insert([{
+        winner_id: isWinner ? (localProfile.id || null) : (remoteProfile?.id || null),
+        loser_id: isWinner ? (remoteProfile?.id || null) : (localProfile.id || null),
+        winner_score: isWinner ? finalScore : (opponentScore || 0),
+        loser_score: isWinner ? (opponentScore || 0) : finalScore,
+        elo_change: mode === "ranked" ? Math.abs(eloChange) : 0,
+        mode: mode.toUpperCase() // 'RANKED' or 'CASUAL'
+      }]).then();
+
       if (mode === "ranked" && localProfile.id) {
         supabase.rpc('update_post_match_stats', {
           p_user_id: localProfile.id,
@@ -239,15 +249,6 @@ function ArenaCore({ mode, localProfile }: { mode: "casual" | "ranked", localPro
           p_is_winner: isWinner,
           p_mode: mode
         }).then();
-
-        supabase.from('matches').insert([{
-          winner_id: isWinner ? localProfile.id : (remoteProfile?.id || null),
-          loser_id: isWinner ? (remoteProfile?.id || null) : localProfile.id,
-          winner_score: isWinner ? finalScore : (opponentScore || 0),
-          loser_score: isWinner ? (opponentScore || 0) : finalScore,
-          elo_change: Math.abs(eloChange),
-          mode: mode
-        }]).then();
 
         if (isWinner && remoteProfile?.id && (remoteProfile?.current_streak || 0) >= 5) {
           supabase.from('nemeses').upsert([{
