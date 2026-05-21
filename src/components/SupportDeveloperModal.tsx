@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Heart, X, Loader2, Crown } from "lucide-react";
+import { Heart, X, Loader2 } from "lucide-react";
 
 interface SupportDeveloperModalProps {
   isOpen: boolean;
@@ -87,7 +87,7 @@ export default function SupportDeveloperModal({ isOpen, onClose }: SupportDevelo
           width: "100%",
           maxWidth: "460px",
           backgroundColor: "#0a0a0c",
-          border: "1px solid rgba(234, 179, 8, 0.2)",
+          border: "1px solid rgba(239, 68, 68, 0.2)",
           borderRadius: "24px",
           padding: "35px 25px",
           position: "relative",
@@ -111,9 +111,9 @@ export default function SupportDeveloperModal({ isOpen, onClose }: SupportDevelo
           <X size={24} />
         </button>
 
-        {/* Floating Animated Golden Crown Badge */}
+        {/* Floating Animated Heart Badge */}
         <div
-          className="crown-badge-container"
+          className="heart-badge-container"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -121,14 +121,14 @@ export default function SupportDeveloperModal({ isOpen, onClose }: SupportDevelo
             width: "64px",
             height: "64px",
             borderRadius: "20px",
-            backgroundColor: "rgba(234, 179, 8, 0.08)",
-            border: "1px solid rgba(234, 179, 8, 0.2)",
+            backgroundColor: "rgba(239, 68, 68, 0.08)",
+            border: "1px solid rgba(239, 68, 68, 0.2)",
             marginBottom: "16px",
-            animation: "float 4s ease-in-out infinite, pulseGlow 3s ease-in-out infinite",
+            animation: "float 4s ease-in-out infinite, pulseHeartGlow 3s ease-in-out infinite",
             position: "relative"
           }}
         >
-          <Crown size={30} color="#eab308" fill="#eab308" style={{ filter: "drop-shadow(0 0 10px rgba(234, 179, 8, 0.6))" }} />
+          <Heart size={30} color="#ef4444" fill="#ef4444" style={{ filter: "drop-shadow(0 0 10px rgba(239, 68, 68, 0.6))" }} />
         </div>
 
         {/* Title */}
@@ -139,12 +139,12 @@ export default function SupportDeveloperModal({ isOpen, onClose }: SupportDevelo
             color: "white",
             margin: "0 0 8px 0",
             letterSpacing: "1.5px",
-            background: "linear-gradient(135deg, #fff 40%, #eab308 100%)",
+            background: "linear-gradient(135deg, #fff 40%, #ef4444 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent"
           }}
         >
-          BECOME A FOUNDING OG
+          SUPPORT THE DEVELOPERS
         </h2>
         
         <p
@@ -152,95 +152,35 @@ export default function SupportDeveloperModal({ isOpen, onClose }: SupportDevelo
             color: "#a1a1aa",
             fontSize: "13px",
             lineHeight: "1.6",
-            marginBottom: "20px",
+            marginBottom: "24px",
           }}
         >
-          Support early development and unlock exclusive{" "}
-          <span style={{ color: "#eab308", fontWeight: "bold" }}>Season 0 prestige</span> forever.
-          <span style={{ color: "#fca5a5", fontSize: "11px", fontWeight: "bold", display: "block", marginTop: "6px", letterSpacing: "0.5px" }}>
-            ⚠️ Only available during Season 0 • Never obtainable again
-          </span>
+          Help us keep the servers running and support early development. Donations directly cover hosting, WebRTC signaling, and database costs.
         </p>
 
-        {/* Supporter Perks Checklist */}
-        <div style={{
-          backgroundColor: "rgba(0,0,0,0.4)",
-          border: "1px solid rgba(255,255,255,0.03)",
-          borderRadius: "16px",
-          padding: "16px",
-          textAlign: "left",
-          marginBottom: "16px"
-        }}>
-          <div style={{ fontSize: "10px", fontWeight: "900", color: "#a855f7", letterSpacing: "1.5px", marginBottom: "12px" }}>EXCLUSIVE SEASON 0 REWARDS</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "12px", color: "#d4d4d8" }}>
-              <span style={{ color: "#eab308", fontWeight: "bold" }}>✔</span>
-              <span><strong>OG Profile Badge</strong> — Shiny badge on profile & chat</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "12px", color: "#d4d4d8" }}>
-              <span style={{ color: "#eab308", fontWeight: "bold" }}>✔</span>
-              <span><strong>Exclusive Name Glow</strong> — Stand out in global chat</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "12px", color: "#d4d4d8" }}>
-              <span style={{ color: "#eab308", fontWeight: "bold" }}>✔</span>
-              <span><strong>Early Supporter Status</strong> — Commemorates early adoption</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "12px", color: "#d4d4d8" }}>
-              <span style={{ color: "#eab308", fontWeight: "bold" }}>✔</span>
-              <span><strong>Future Drop Access</strong> — Free cosmetic priority drops</span>
-            </div>
-          </div>
-        </div>
-
         {/* Server Funding Progress */}
-        <div style={{ textAlign: "left", marginBottom: "16px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "900", color: "#eab308", marginBottom: "6px", letterSpacing: "1.5px" }}>
+        <div style={{ textAlign: "left", marginBottom: "24px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "900", color: "#ef4444", marginBottom: "6px", letterSpacing: "1.5px" }}>
             <span>SERVER FUNDING GOAL</span>
             <span>72% FUNDED</span>
           </div>
-          <div style={{ height: "6px", backgroundColor: "#141416", borderRadius: "3px", border: "1px solid rgba(234, 179, 8, 0.15)", overflow: "hidden" }}>
-            <div style={{ width: "72%", height: "100%", background: "linear-gradient(90deg, #7c3aed, #eab308)", borderRadius: "3px" }} />
-          </div>
-        </div>
-
-        {/* Live Social Proof Roster Ticker */}
-        <div style={{
-          overflow: "hidden",
-          width: "100%",
-          backgroundColor: "rgba(0, 0, 0, 0.3)",
-          border: "1px solid rgba(255, 255, 255, 0.03)",
-          borderRadius: "8px",
-          padding: "8px 0",
-          marginBottom: "20px",
-          position: "relative"
-        }}>
-          <div className="ticker-wrapper" style={{
-            display: "flex",
-            gap: "35px",
-            width: "max-content",
-            animation: "ticker 25s linear infinite"
-          }}>
-            <span style={{ fontSize: "10px", fontWeight: "900", color: "#71717a", letterSpacing: "1.5px" }}>
-              RECENT FOUNDERS: VOIDREAPER • MIDNIGHTKING • TERRACHAD • DHRUBO • GHOST • VOIDRUNNER • ZEPHYR • CRIMSON
-            </span>
-            <span style={{ fontSize: "10px", fontWeight: "900", color: "#71717a", letterSpacing: "1.5px" }}>
-              RECENT FOUNDERS: VOIDREAPER • MIDNIGHTKING • TERRACHAD • DHRUBO • GHOST • VOIDRUNNER • ZEPHYR • CRIMSON
-            </span>
+          <div style={{ height: "6px", backgroundColor: "#141416", borderRadius: "3px", border: "1px solid rgba(239, 68, 68, 0.15)", overflow: "hidden" }}>
+            <div style={{ width: "72%", height: "100%", background: "linear-gradient(90deg, #7c3aed, #ef4444)", borderRadius: "3px" }} />
           </div>
         </div>
 
         {!session ? (
           <div>
             <div style={{ color: "white", fontWeight: "bold", marginBottom: "15px", fontSize: "14px" }}>
-              Sign in to claim Founder status.
+              Sign in to support the developers.
             </div>
             <button
               onClick={handleGoogleLogin}
               style={{
                 width: "100%",
                 padding: "14px",
-                backgroundColor: "#eab308",
-                color: "black",
+                backgroundColor: "#ef4444",
+                color: "white",
                 fontWeight: "950",
                 border: "none",
                 borderRadius: "10px",
@@ -262,9 +202,9 @@ export default function SupportDeveloperModal({ isOpen, onClose }: SupportDevelo
                   onClick={() => { setAmount(preset); setError(null); }}
                   style={{
                     padding: "10px 18px",
-                    backgroundColor: amount === preset ? "#eab308" : "#18181b",
-                    color: amount === preset ? "black" : "#a1a1aa",
-                    border: amount === preset ? "1px solid #eab308" : "1px solid #27272a",
+                    backgroundColor: amount === preset ? "#ef4444" : "#18181b",
+                    color: amount === preset ? "white" : "#a1a1aa",
+                    border: amount === preset ? "1px solid #ef4444" : "1px solid #27272a",
                     borderRadius: "8px",
                     cursor: preset === amount ? "none" : "pointer",
                     fontWeight: "bold",
@@ -316,7 +256,7 @@ export default function SupportDeveloperModal({ isOpen, onClose }: SupportDevelo
                   MozAppearance: "textfield",
                   WebkitAppearance: "none",
                 } as React.CSSProperties}
-                onFocus={(e) => (e.target.style.borderColor = "#eab308")}
+                onFocus={(e) => (e.target.style.borderColor = "#ef4444")}
                 onBlur={(e) => (e.target.style.borderColor = "#27272a")}
               />
             </div>
@@ -349,15 +289,15 @@ export default function SupportDeveloperModal({ isOpen, onClose }: SupportDevelo
               style={{
                 width: "100%",
                 padding: "16px",
-                backgroundColor: isProcessing || amount < 1 ? "#27272a" : "#eab308",
-                color: isProcessing || amount < 1 ? "#52525b" : "black",
+                backgroundColor: isProcessing || amount < 1 ? "#27272a" : "#ef4444",
+                color: isProcessing || amount < 1 ? "#52525b" : "white",
                 border: "none",
                 borderRadius: "12px",
                 cursor: isProcessing || amount < 1 ? "not-allowed" : "pointer",
                 fontWeight: "955",
                 fontSize: "15px",
                 transition: "all 0.2s",
-                boxShadow: isProcessing || amount < 1 ? "none" : "0 0 20px rgba(234, 179, 8, 0.35)",
+                boxShadow: isProcessing || amount < 1 ? "none" : "0 0 20px rgba(239, 68, 68, 0.35)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -371,14 +311,14 @@ export default function SupportDeveloperModal({ isOpen, onClose }: SupportDevelo
                   PROCESSING...
                 </>
               ) : (
-                `UNLOCK FOUNDING OG STATUS ($${amount})`
+                `SUPPORT THE DEVS ($${amount})`
               )}
             </button>
 
             <p style={{ color: "#3f3f46", fontSize: "10px", marginTop: "14px", lineHeight: "1.5" }}>
               Secure checkout via NOWPayments. You'll be redirected to complete payment.
             </p>
-            <p style={{ color: "#71717a", fontSize: "11px", marginTop: "10px", lineHeight: "1.5", backgroundColor: "rgba(234, 179, 8, 0.03)", padding: "10px 12px", borderRadius: "8px", border: "1px solid rgba(234, 179, 8, 0.1)" }}>
+            <p style={{ color: "#71717a", fontSize: "11px", marginTop: "10px", lineHeight: "1.5", backgroundColor: "rgba(239, 68, 68, 0.03)", padding: "10px 12px", borderRadius: "8px", border: "1px solid rgba(239, 68, 68, 0.1)" }}>
               💡 <strong>Tip:</strong> To avoid high network gas fees on small donations, we highly recommend using the default LTC (Litecoin) or selecting SOL / USDT (TRC20) at checkout.
             </p>
           </div>
@@ -395,10 +335,10 @@ export default function SupportDeveloperModal({ isOpen, onClose }: SupportDevelo
           50% { transform: translateY(-6px) rotate(2deg); }
           100% { transform: translateY(0px) rotate(0deg); }
         }
-        @keyframes pulseGlow {
-          0% { box-shadow: 0 0 15px rgba(234, 179, 8, 0.1); border-color: rgba(234, 179, 8, 0.2); }
-          50% { box-shadow: 0 0 25px rgba(234, 179, 8, 0.4); border-color: rgba(234, 179, 8, 0.5); }
-          100% { box-shadow: 0 0 15px rgba(234, 179, 8, 0.1); border-color: rgba(234, 179, 8, 0.2); }
+        @keyframes pulseHeartGlow {
+          0% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); }
+          50% { box-shadow: 0 0 25px rgba(239, 68, 68, 0.4); border-color: rgba(239, 68, 68, 0.5); }
+          100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); }
         }
         @keyframes ticker {
           0% { transform: translateX(0); }

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Swords, Trophy, BarChart3, ShieldCheck, Star, MessageCircle, Send, X, Copy, Check, Heart } from "lucide-react";
@@ -7,7 +7,7 @@ import Link from "next/link";
 import Image from "next/image";
 import SupportDeveloperModal from "@/components/SupportDeveloperModal";
 import { usePresence } from "@/hooks/usePresence";
-import { RANK_GROUPS, getPrestigeRankInfo } from "@/utils/eloMath";
+import { RANK_GROUPS, getPrestigeRankInfo, getKFactor } from "@/utils/eloMath";
 
 const getRankStyle = (tierName: string) => {
   if (tierName === "SYSTEM") {
@@ -73,13 +73,6 @@ const RANK_DETAILS: Record<string, { pct: string, aura: string, reward: string }
   "DOOMER": { pct: "Bottom 5%", aura: "Aura Level 1", reward: "Doomer Background" }
 };
 
-const RANDOM_MOGGERS = [
-  "VOIDREAPER", "MIDNIGHTKING", "TERRACHAD", "VOIDRUNNER", "ZEPHYR", "CRIMSON", 
-  "CHADGIGANTE", "AURA_GOD", "ELITE_MOGGER", "SHADOW_CHAD", "DHRUBO", "GHOST", 
-  "NEOMOGGER", "ALPHA_OMEGA", "GIGACHAD", "Slayer", "Spectre", "Kaelen", "Kratos",
-  "Xenon", "Viper", "Raptor", "Zenith", "Phoenix", "Nova", "Apex", "Shadow"
-];
-
 export default function Lobby() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"modes" | "ranks">("modes");
@@ -90,17 +83,25 @@ export default function Lobby() {
   const [currentTier, setCurrentTier] = useState<string>("LTN");
   const [currentStreak, setCurrentStreak] = useState<number>(0);
   const [highestStreak, setHighestStreak] = useState<number>(0);
-  const [isSupporter, setIsSupporter] = useState<boolean>(false);
   const [currentElo, setCurrentElo] = useState<number>(1000);
-  const [supporterUserIds, setSupporterUserIds] = useState<Set<string>>(new Set());
-  const [rankedQueueCount, setRankedQueueCount] = useState(218);
+  const [rankedQueueCount, setRankedQueueCount] = useState(0);
+  const [activeRoomsCount, setActiveRoomsCount] = useState(0);
   const [liveActivities, setLiveActivities] = useState<any[]>([]);
+  const lastFetchedMatchTimeRef = useRef<string | null>(null);
   
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
   const { onlineCount } = usePresence();
+
+  const getAvgWaitTime = () => {
+    if (rankedQueueCount > 0) return "< 10s";
+    if (onlineCount <= 1) return "--";
+    if (onlineCount < 5) return "~ 2m";
+    if (onlineCount < 10) return "~ 1m";
+    return "~ 30s";
+  };
 
   // Private Room State
   const [isPrivateModalOpen, setIsPrivateModalOpen] = useState(false);
@@ -145,57 +146,6 @@ export default function Lobby() {
     });
   };
 
-  const generateRandomEvent = (names: string[]) => {
-    const pickRandom = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
-    const p1 = pickRandom(names);
-    let p2 = pickRandom(names);
-    while (p2 === p1) {
-      p2 = pickRandom(names);
-    }
-    
-    const types = ["win", "rankup", "streakloss", "streakgain", "queue"];
-    const type = pickRandom(types);
-    
-    let text = "";
-    let highlight = "";
-    
-    switch(type) {
-      case "win":
-        const eloVal = Math.floor(Math.random() * 15) + 18;
-        text = `${p1} defeated ${p2} (+${eloVal} ELO)`;
-        highlight = `+${eloVal} ELO`;
-        break;
-      case "rankup":
-        const rank = pickRandom(["CHADLITE", "CHAD", "TERRACHAD", "TRUE ADAM", "HTN"]);
-        text = `${p1} reached ${rank} tier`;
-        highlight = rank;
-        break;
-      case "streakloss":
-        const lostStreak = Math.floor(Math.random() * 6) + 4;
-        text = `${p1} lost a ${lostStreak} win streak`;
-        highlight = `${lostStreak} win streak`;
-        break;
-      case "streakgain":
-        const streakVal = Math.floor(Math.random() * 7) + 3;
-        text = `${p1} is on a ${streakVal} win streak!`;
-        highlight = `${streakVal} win streak`;
-        break;
-      case "queue":
-      default:
-        text = `${p1} entered the Matchmaking Queue`;
-        highlight = "Queue";
-        break;
-    }
-    
-    return {
-      id: Math.random().toString(),
-      text,
-      type,
-      highlight,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    };
-  };
-
   // Fetch initial data
   useEffect(() => {
     const fetchData = async () => {
@@ -207,14 +157,7 @@ export default function Lobby() {
         .limit(10);
       if (leaders) setLeaderboard(leaders);
 
-      // Fetch all supporter IDs to show badges in chat
-      const { data: supporters } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('is_supporter', true);
-      if (supporters) {
-        setSupporterUserIds(new Set(supporters.map(s => s.id)));
-      }
+
 
       // Fetch current user and their recent matches
       const { data: { session } } = await supabase.auth.getSession();
@@ -222,7 +165,7 @@ export default function Lobby() {
         setCurrentUserId(session.user.id);
         const { data: profile } = await supabase
             .from('profiles')
-            .select('username, elo, current_streak, highest_streak, is_supporter')
+            .select('username, elo, current_streak, highest_streak')
             .eq('id', session.user.id)
             .single();
         
@@ -231,7 +174,6 @@ export default function Lobby() {
           setCurrentTier(getPrestigeRankInfo(profile.elo || 1200).name);
           setCurrentStreak(profile.current_streak || 0);
           setHighestStreak(profile.highest_streak || 0);
-          setIsSupporter(profile.is_supporter || false);
           setCurrentElo(profile.elo || 1000);
         }
 
@@ -255,47 +197,83 @@ export default function Lobby() {
     fetchData();
   }, [supabase]);
 
-  // Set up live activities feed and system chat integration
-  useEffect(() => {
-    const getMockUsernames = () => {
-      const leaderboardNames = leaderboard.map(u => u.username).filter(Boolean);
-      return leaderboardNames.length > 0 ? leaderboardNames : RANDOM_MOGGERS;
-    };
-
-    const names = getMockUsernames();
-    const initial = Array.from({ length: 4 }).map(() => generateRandomEvent(names));
-    setLiveActivities(initial);
-
-    const interval = setInterval(() => {
-      const namesList = getMockUsernames();
-      const newEvent = generateRandomEvent(namesList);
-      setLiveActivities(prev => [newEvent, ...prev.slice(0, 3)]);
-      
-      // Inject system message into global chat locally to make it feel alive!
-      if (Math.random() > 0.4) {
-        setChatMessages(prev => [
-          ...prev.slice(1), // keep it capped at 50
-          {
-            id: "system-" + Date.now() + Math.random(),
-            username: "SYSTEM",
-            message: newEvent.text,
-            tier: "SYSTEM",
-            created_at: new Date().toISOString()
-          }
-        ]);
+  // Fetch live arena counts and global matches
+  const fetchArenaMetrics = useCallback(async () => {
+    try {
+      // 1. Fetch exact head count from ranked_queue
+      const { count: queueCount, error: qErr } = await supabase
+        .from("ranked_queue")
+        .select("*", { count: "exact", head: true });
+      if (!qErr && queueCount !== null) {
+        setRankedQueueCount(queueCount);
       }
-    }, 6000);
 
-    return () => clearInterval(interval);
-  }, [leaderboard]);
+      // 2. Fetch unique room code list from private_rooms
+      const { data: rooms, error: rErr } = await supabase
+        .from("private_rooms")
+        .select("room_code");
+      if (!rErr && rooms) {
+        const uniqueRooms = new Set(rooms.map(r => r.room_code)).size;
+        setActiveRoomsCount(uniqueRooms);
+      }
 
-  // Queue fluctuations
+      // 3. Fetch last 4 matches with winner/loser usernames
+      const { data: matches, error: mErr } = await supabase
+        .from("matches")
+        .select(`
+          id,
+          winner_id,
+          loser_id,
+          winner_score,
+          loser_score,
+          elo_change,
+          mode,
+          created_at,
+          winner:profiles!matches_winner_id_fkey(username),
+          loser:profiles!matches_loser_id_fkey(username)
+        `)
+        .order("created_at", { ascending: false })
+        .limit(4);
+
+      if (!mErr && matches && matches.length > 0) {
+        const formattedActivities = matches.map((m: any) => {
+          const winnerName = m.winner?.username || "Anonymous";
+          const loserName = m.loser?.username || "Anonymous";
+          const eloChange = m.elo_change || 0;
+          return {
+            id: m.id,
+            text: `${winnerName} defeated ${loserName} (+${eloChange} ELO)`,
+            type: "win",
+            highlight: `+${eloChange} ELO`,
+            timestamp: new Date(m.created_at).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              second: "2-digit",
+            }),
+            created_at: m.created_at
+          };
+        });
+
+        setLiveActivities(formattedActivities);
+
+        // Update the last fetched match timestamp to the latest match's created_at
+        // Or if it's the initial fetch, seed it
+        const latestTime = matches[0].created_at;
+        if (!lastFetchedMatchTimeRef.current || latestTime > lastFetchedMatchTimeRef.current) {
+          lastFetchedMatchTimeRef.current = latestTime;
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching arena metrics:", err);
+    }
+  }, [supabase]);
+
+  // Poll arena metrics (queue count, active rooms, recent matches)
   useEffect(() => {
-    const interval = setInterval(() => {
-      setRankedQueueCount(prev => Math.max(180, Math.min(250, prev + Math.floor(Math.random() * 9) - 4)));
-    }, 4000);
+    fetchArenaMetrics(); // Initial fetch
+    const interval = setInterval(fetchArenaMetrics, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchArenaMetrics]);
 
   // Real-time chat subscription
   useEffect(() => {
@@ -494,12 +472,11 @@ export default function Lobby() {
               boxShadow: "0 0 8px #22c55e"
             }} />
             <span style={{ fontSize: "11px", fontWeight: "900", color: "#22c55e", letterSpacing: "1px" }}>
-              {((onlineCount || 1) * 7 + 138).toLocaleString()} PLAYERS ONLINE
+              {(onlineCount || 1).toLocaleString()} PLAYERS ONLINE
             </span>
           </div>
         </div>
 
-        {/* ─── HERO STATUS AREA ─── */}
         <div style={{
           background: "linear-gradient(135deg, rgba(20, 20, 25, 0.7) 0%, rgba(10, 10, 12, 0.9) 100%)",
           border: "1px solid rgba(255, 255, 255, 0.05)",
@@ -562,20 +539,6 @@ export default function Lobby() {
                   <div style={{ fontSize: "10px", fontWeight: "900", color: "#ef4444", letterSpacing: "2.5px" }}>YOUR CURRENT STATUS</div>
                   <div style={{ fontSize: "24px", fontWeight: "950", color: "white", display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
                     {currentUsername}
-                    {isSupporter && (
-                      <span title="Founding OG" style={{
-                        fontSize: "9px",
-                        fontWeight: "950",
-                        background: "linear-gradient(135deg, #a855f7, #c084fc)",
-                        color: "white",
-                        padding: "2px 7px",
-                        borderRadius: "5px",
-                        letterSpacing: "0.5px",
-                        boxShadow: "0 0 10px rgba(168, 85, 247, 0.6)",
-                        display: "inline-block",
-                        textShadow: "none"
-                      }}>OG</span>
-                    )}
                   </div>
                   <div style={{ fontSize: "13px", color: "#a1a1aa", marginTop: "3px", fontWeight: "600" }}>
                     <span style={{ color: currentRank.color, textShadow: currentRank.glow, fontWeight: "900" }}>{currentRank.name}</span>
@@ -683,7 +646,7 @@ export default function Lobby() {
             onClick={() => setIsSupportModalOpen(true)}
             style={{ letterSpacing: "0.5px" }}
           >
-            <Heart size={14} fill="white" /> FOUNDER ACCESS
+            <Heart size={14} fill="white" /> SUPPORT THE DEVS
           </button>
         </div>
 
@@ -713,10 +676,10 @@ export default function Lobby() {
                         QUEUE: {rankedQueueCount} PLAYERS
                       </span>
                       <span style={{ fontSize: "10px", fontWeight: "900", color: "#38bdf8", background: "rgba(56, 189, 248, 0.08)", border: "1px solid rgba(56, 189, 248, 0.15)", padding: "4px 10px", borderRadius: "6px", letterSpacing: "0.5px" }}>
-                        AVG WAIT: 6s
+                        AVG WAIT: {getAvgWaitTime()}
                       </span>
                       <span style={{ fontSize: "10px", fontWeight: "900", color: "#22c55e", background: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.15)", padding: "4px 10px", borderRadius: "6px", letterSpacing: "0.5px" }}>
-                        +32 ELO POSSIBLE
+                        +{getKFactor(currentElo)} ELO POSSIBLE
                       </span>
                       {currentStreak >= 3 && (
                         <span className="pulse-fast" style={{ fontSize: "10px", fontWeight: "955", color: "#ef4444", background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.3)", padding: "4px 10px", borderRadius: "6px", boxShadow: "0 0 10px rgba(239, 68, 68, 0.2)", letterSpacing: "0.5px" }}>
@@ -759,7 +722,7 @@ export default function Lobby() {
                   stats={
                     <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "8px" }}>
                       <span style={{ fontSize: "10px", fontWeight: "900", color: "#22c55e", background: "rgba(34, 197, 94, 0.08)", border: "1px solid rgba(34, 197, 94, 0.15)", padding: "4px 10px", borderRadius: "6px", letterSpacing: "0.5px" }}>
-                        12 ACTIVE ROOMS
+                        {activeRoomsCount === 1 ? "1 ACTIVE ROOM" : `${activeRoomsCount} ACTIVE ROOMS`}
                       </span>
                       <span style={{ fontSize: "10px", fontWeight: "900", color: "#71717a", background: "rgba(255, 255, 255, 0.03)", border: "1px solid rgba(255, 255, 255, 0.05)", padding: "4px 10px", borderRadius: "6px", letterSpacing: "0.5px" }}>
                         NO ELO RATING IMPACT
@@ -953,36 +916,9 @@ export default function Lobby() {
                 {chatMessages.map((msg) => {
                   const isSystem = msg.username === "SYSTEM" || msg.tier === "SYSTEM";
                   const rank = getRankStyle(msg.tier);
-                  const msgUserSupporter = supporterUserIds.has(msg.user_id) || (msg.user_id === currentUserId && isSupporter);
                   
                   if (isSystem) {
-                    return (
-                      <div key={msg.id} style={{
-                        fontSize: "11px",
-                        lineHeight: "1.4",
-                        backgroundColor: "rgba(239, 68, 68, 0.04)",
-                        border: "1px solid rgba(239, 68, 68, 0.15)",
-                        padding: "6px 10px",
-                        borderRadius: "6px",
-                        color: "#fca5a5",
-                        fontWeight: "bold",
-                        boxShadow: "0 0 10px rgba(239, 68, 68, 0.05)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px"
-                      }}>
-                        <span style={{
-                          backgroundColor: "#ef4444",
-                          color: "white",
-                          fontSize: "8px",
-                          fontWeight: "955",
-                          padding: "1px 5px",
-                          borderRadius: "4px",
-                          letterSpacing: "0.5px"
-                        }}>SYSTEM</span>
-                        <span>{msg.message}</span>
-                      </div>
-                    );
+                    return null;
                   }
                   
                   return (
@@ -992,21 +928,9 @@ export default function Lobby() {
                         display: "inline-flex",
                         alignItems: "center",
                         gap: "4px",
-                        textShadow: msgUserSupporter ? "0 0 8px #c084fc" : rank.glow,
-                        color: msgUserSupporter ? "#c084fc" : rank.color
+                        textShadow: rank.glow,
+                        color: rank.color
                       }}>
-                        {msgUserSupporter && (
-                          <span title="Founding OG Supporter" style={{
-                            fontSize: "8px",
-                            fontWeight: "955",
-                            background: "linear-gradient(135deg, #a855f7, #c084fc)",
-                            color: "white",
-                            padding: "1px 4px",
-                            borderRadius: "3px",
-                            lineHeight: 1,
-                            boxShadow: "0 0 6px rgba(168, 85, 247, 0.4)"
-                          }}>OG</span>
-                        )}
                         {msg.username}:
                       </span>
                       <span style={{ color: "#d4d4d8", wordBreak: "break-word" }}>{msg.message}</span>
