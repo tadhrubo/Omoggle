@@ -3,7 +3,10 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Swords, Trophy, BarChart3, ShieldCheck, Star, MessageCircle, Send, X, Copy, Check, Heart } from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
 import SupportDeveloperModal from "@/components/SupportDeveloperModal";
+
 
 import { RANK_GROUPS, getPrestigeRankInfo } from "@/utils/eloMath";
 
@@ -235,6 +238,27 @@ export default function Lobby() {
 
       <div className="lobby-container">
         
+        {/* Logo Button Row */}
+        <div style={{ padding: "10px 0 25px 0", display: "flex", justifyContent: "flex-start" }}>
+          <Link href="/" style={{ display: "inline-flex", transition: "transform 0.2s ease" }}
+            onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+            onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          >
+            <Image
+              src="/logo.png"
+              alt="Omoggle Logo"
+              width={48}
+              height={48}
+              priority
+              style={{
+                borderRadius: "12px",
+                boxShadow: "0 0 20px rgba(239, 68, 68, 0.3)",
+                border: "1px solid rgba(255,255,255,0.1)",
+              }}
+            />
+          </Link>
+        </div>
+
         {/* ─── ROW 1: Tabs ─── */}
         <div className="lobby-header-top">
           <div style={{ display: "flex", gap: "24px", borderBottom: "1px solid #18181b", paddingBottom: 0 }}>

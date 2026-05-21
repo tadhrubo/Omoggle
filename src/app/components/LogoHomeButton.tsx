@@ -1,8 +1,15 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 
 export default function LogoHomeButton() {
+  const pathname = usePathname();
+
+  if (pathname === "/lobby") {
+    return null;
+  }
+
   return (
     <Link
       href="/"
@@ -33,3 +40,4 @@ export default function LogoHomeButton() {
     </Link>
   );
 }
+
