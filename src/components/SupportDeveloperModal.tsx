@@ -158,16 +158,6 @@ export default function SupportDeveloperModal({ isOpen, onClose }: SupportDevelo
           Help us keep the servers running and support early development. Donations directly cover hosting, WebRTC signaling, and database costs.
         </p>
 
-        {/* Server Funding Progress */}
-        <div style={{ textAlign: "left", marginBottom: "24px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", fontWeight: "900", color: "#ef4444", marginBottom: "6px", letterSpacing: "1.5px" }}>
-            <span>SERVER FUNDING GOAL</span>
-            <span>72% FUNDED</span>
-          </div>
-          <div style={{ height: "6px", backgroundColor: "#141416", borderRadius: "3px", border: "1px solid rgba(239, 68, 68, 0.15)", overflow: "hidden" }}>
-            <div style={{ width: "72%", height: "100%", background: "linear-gradient(90deg, #7c3aed, #ef4444)", borderRadius: "3px" }} />
-          </div>
-        </div>
 
         {!session ? (
           <div>
