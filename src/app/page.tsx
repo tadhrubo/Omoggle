@@ -374,11 +374,6 @@ export default function Home() {
 
       </div>
 
-      <div style={{ display: "flex", justifyContent: "center", gap: "clamp(30px, 8vw, 80px)", textAlign: "center" }}>
-        {/* <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{animatedUsers >= 1000 ? (animatedUsers / 1000).toFixed(1) + 'K' : animatedUsers}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>MOGGERS REGISTERED</div></div> */}
-        <div><div style={{ color: "#ef4444", fontSize: "2.5rem", fontWeight: "900", marginBottom: "5px" }}>{onlineCount}</div><div style={{ color: "#71717a", fontSize: "10px", letterSpacing: "2px" }}>ACTIVE NOW</div></div>
-      </div>
-
 
       {/* ─── SEO CONTENT CLUSTER ─── */}
       <div style={{ width: "100%", maxWidth: "1100px", marginTop: "100px", padding: "0 20px", paddingBottom: "120px", textAlign: "left", zIndex: 10, position: "relative" }}>
