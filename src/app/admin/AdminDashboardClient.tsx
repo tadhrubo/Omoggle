@@ -91,7 +91,7 @@ export default function AdminDashboardClient({
   // Navigation & Tabs
   const [activeTab, setActiveTab] = useState<"chart" | "players" | "matches">("chart");
 
-  // ── Real-time presence counter (replaces inflated WebSocket count) ─────
+  // ── Real-time presence counter (replaces inflated WebSocket count) ──
   const { onlineCount } = usePresence();
 
   const [timeRange, setTimeRange] = useState<"24h" | "30d" | "12w" | "12m">("30d");
