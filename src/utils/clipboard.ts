@@ -1,6 +1,6 @@
 /**
  * Safely copies text to the clipboard across all secure and insecure environments,
- * fallbacking to old-school document.execCommand when navigator.clipboard is unavailable.
+ * fallbacking to old-school document.execCommand when navigator.clipbo is unavailable.
  */
 export async function safeCopyToClipboard(text: string): Promise<boolean> {
   if (typeof window === "undefined") return false;
