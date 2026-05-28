@@ -118,7 +118,7 @@ export function usePrivateRoom({ roomCode, playerElo = 1200, onDisconnect, onRem
         peer.on("open", async () => {
           if (!isMounted) return;
 
-          // 3. Register in the private_rooms table
+          // 3. Register in the private_room table
           const { error: insertError } = await supabase
             .from("private_rooms")
             .insert([{ room_code: roomCode.toUpperCase(), peer_id: peer.id, elo: playerElo }]);
