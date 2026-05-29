@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 export function useAnalytics() {
   const supabase = createClient();
 
-  // Get or create a persistent anonymous device ID for retention tracking
+  // Get or create a persistent anonymous device ID for retention track
   const getUserId = () => {
     if (typeof window === "undefined") return "server";
     let uid = localStorage.getItem("omoggle_anon_id");
