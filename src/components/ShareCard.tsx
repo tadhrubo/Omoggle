@@ -21,7 +21,7 @@ export default function ShareCard({
 }: ShareCardProps) {
   return (
     <div id="share-card-container" className="w-[1080px] h-[1920px] relative overflow-hidden bg-black font-sans select-none z-0">
-      {/* Absolute Background Image */}
+      {/* AbsoluteBackgroundImage */}
       <img
         src="/bg_pattern.jpg"
         alt="background"
